@@ -1,0 +1,1 @@
+/dev_hdd0/game/PRXLOADER/USRDIR/webftp_server.sprx
