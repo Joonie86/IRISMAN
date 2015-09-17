@@ -106,7 +106,7 @@ int is_firm_475(void)
    toc =peekq(0x8000000000003000ULL);
    if(toc == 0x800000000034FBB0ULL)
    {
-      return 1;
+      return (peekq(0x80000000002FCB68ULL)!=0x323031352F30382FULL); //timestamp: 2015/04
    }
    else
    {
@@ -114,6 +114,20 @@ int is_firm_475(void)
    }
 }
 
+int is_firm_476(void)
+{
+    // TOC 4.76 (same as 4.75)
+   u64 toc;
+   toc =peekq(0x8000000000003000ULL);
+   if(toc == 0x800000000034FBB0ULL)
+   {
+      return (peekq(0x80000000002FCB68ULL)==0x323031352F30382FULL); //timestamp: 2015/08
+   }
+   else
+   {
+      return 0;
+   }
+}
 extern u64 syscall_base;
 
 int is_payload_loaded_475(void)
@@ -268,20 +282,9 @@ void load_payload_475(int mode)
     pokeq(0x80000000007EF000ULL, 0ULL);// BD Emu mount
     pokeq(0x80000000007EF220ULL, 0ULL);
 
-    //patches by deank for webMAN, I left them here just in case someone wants to play with, but basically the same thing with SYS36 patches below
-
-/*			pokeq(0x800000000026714CULL, 0x4E80002038600000ULL ); // fix 8001003C error  Original: 0x4E8000208003026CULL
-			pokeq(0x8000000000267154ULL, 0x7C6307B44E800020ULL ); // fix 8001003C error  Original: 0x3D6000473D201B43ULL
-			pokeq(0x800000000005658CULL, 0x63FF003D60000000ULL ); // fix 8001003D error  Original: 0x63FF003D419EFFD4ULL
-			pokeq(0x8000000000056650ULL, 0x3FE080013BE00000ULL ); // fix 8001003E error  Original: 0x3FE0800163FF003EULL
-
-			pokeq(0x80000000000565FCULL, 0x419E00D860000000ULL ); // Original: 0x419E00D8419D00C0ULL
-			pokeq(0x8000000000056604ULL, 0x2F84000448000098ULL ); // Original: 0x2F840004409C0048ULL //PATCH_JUMP
-			pokeq(0x800000000005A6E0ULL, 0x2F83000060000000ULL ); // fix 80010009 error  Original: 0x2F830000419E00ACULL
-			pokeq(0x800000000005A6F4ULL, 0x2F83000060000000ULL ); // fix 80010009 error  Original: 0x2F830000419E00ACULL
-*/
-			pokeq(0x8000000000056230ULL, 0x386000012F830000ULL ); // ignore LIC.DAT check
-			pokeq(0x80000000002275F4ULL, 0x38600000F8690000ULL ); // fix 0x8001002B / 80010017 errors (2015-01-03)
+    //patches by deank , backup protection removal needed since OFW 4.60+
+	pokeq(0x8000000000056230ULL, 0x386000012F830000ULL ); // ignore LIC.DAT check
+	pokeq(0x80000000002275F4ULL, 0x38600000F8690000ULL ); // fix 0x8001002B / 80010017 errors (2015-01-03)
 
     /* BASIC PATCHES SYS36 */
     // by 2 anonymous people

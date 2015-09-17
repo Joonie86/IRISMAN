@@ -139,8 +139,8 @@ bool test_controlfan_compatibility()
        firmware == 0x440C || firmware == 0x441C || firmware == 0x441D || firmware == 0x446C || firmware == 0x446D ||
        firmware == 0x450C || firmware == 0x450D || firmware == 0x453C || firmware == 0x453D || firmware == 0x455C || firmware == 0x455D ||
        firmware == 0x460C || firmware == 0x460D || firmware == 0x465C || firmware == 0x465D || firmware == 0x466C || firmware == 0x466D ||
-       firmware == 0x470C || firmware == 0x470D || firmware == 0x475C || firmware == 0x475D
-      )
+       firmware == 0x470C || firmware == 0x470D || firmware == 0x475C || firmware == 0x475D || firmware == 0x476C 
+	   )
         return true;
     else
         return false;
@@ -473,7 +473,7 @@ int load_ps3_controlfan_payload()
         lv2poke32(0x800000000000A47CULL, 0x38600001); // sys 386
 
         ret = 1;
-    }  else if(firmware == 0x475C) { // firmware 4.75
+    }  else if((firmware == 0x475C) || (firmware == 0x476C)) { // firmware 4.75
 
         // enables sys_game_get_temperature
         lv2poke32(0x800000000000C6A8ULL, 0x38600000); // sys 383

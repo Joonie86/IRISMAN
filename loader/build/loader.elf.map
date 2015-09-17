@@ -3674,4 +3674,4 @@ END GROUP
 LOAD c:/psdk3v2/ps3dev/ppu/bin/../lib/gcc/powerpc64-ps3-elf/4.5.2\libgcc.a
 LOAD c:/psdk3v2/ps3dev/ppu/bin/../lib/gcc/powerpc64-ps3-elf/4.5.2/crtend.o
 LOAD c:/psdk3v2/ps3dev/ppu/bin/../lib/gcc/powerpc64-ps3-elf/4.5.2/../../../../powerpc64-ps3-elf/lib/lv2-crtn.o
-OUTPUT(d:/REBUG/IRIS348/loader/loader.elf elf64-powerpc)
+OUTPUT(d:/Console/REBUG/IRISMAN/loader/loader.elf elf64-powerpc)

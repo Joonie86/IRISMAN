@@ -253,7 +253,7 @@ void load_payload_446(int mode)
 
     pokeq(0x80000000007EF000ULL, 0ULL);// BE Emu mount
     pokeq(0x80000000007EF220ULL, 0ULL);
-
+/*
     //Patches from webMAN
     pokeq(0x8000000000297310ULL, 0x4E80002038600000ULL ); // fix 8001003C error
     pokeq(0x8000000000297318ULL, 0x7C6307B44E800020ULL ); // fix 8001003C error
@@ -264,7 +264,7 @@ void load_payload_446(int mode)
     pokeq(0x8000000000056138ULL, 0x2F84000448000098ULL );
     pokeq(0x8000000000059AF4ULL, 0x2F83000060000000ULL );
     pokeq(0x8000000000059B08ULL, 0x2F83000060000000ULL );
-
+*/
     /* BASIC PATCHES SYS36 */
     // by 2 anonymous people
     _poke32(0x56134, 0x60000000); // done

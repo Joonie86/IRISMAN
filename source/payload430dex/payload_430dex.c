@@ -94,17 +94,19 @@ static inline void _poke32(u64 addr, uint32_t val)
 }
 
 int is_firm_430dex(void)
+
 {
-// 4.30 dex
-    u64 addr = peekq((SYSCALL_BASE + NEW_POKE_SYSCALL * 8));
-    // check address first
-    if(addr < 0x8000000000000000ULL || addr > 0x80000000007FFFFFULL || (addr & 3)!=0)
-        return 0;
-    addr = peekq(addr);
-
-    if(addr == NEW_POKE_SYSCALL_ADDR && peekq( 0x800000000000C4C0ULL ) == 0x2F8300007F84E378ULL ) return 1;
-
-return 0;
+    // TOC 4.30 DEX
+   u64 toc;
+   toc =peekq(0x8000000000003000ULL);
+   if(toc == 0x8000000000365CA0ULL)
+   {
+      return 1;
+   }
+   else
+   {
+      return 0;
+   }
 }
 
 extern u64 syscall_base;
@@ -215,23 +217,14 @@ static u64 lv1poke(u64 addr, u64 value)
 
 void load_payload_430dex(int mode)
 {
-    //Remove lv2 memory protection ( only for cfw Rebug 4.30)
-
-	/*if(peekq(0x8000000000001748ULL) == 0x4400002238600000ULL); // if lv1poke is present...
-	{*/
 //Remove Lv2 memory protection
     lv1poke(0x370AA8     , 0x0000000000000001ULL);
     lv1poke(0x370AA8 + 8 , 0xE0D251B556C59F05ULL);
     lv1poke(0x370AA8 + 16, 0xC232FCAD552C80D7ULL);
     lv1poke(0x370AA8 + 24, 0x65140CD200000000ULL);
 
-	//}
-/*
-	//fix for memcpy syscall on use
-	pokeq(0x800000000037E048ULL,0x8000000000001500ULL);
-	pokeq(0x8000000000001500ULL,0x8000000000001510ULL);*/
-
     install_lv2_memcpy();
+
     /* WARNING!! It supports only payload with a size multiple of 8 */
     lv2_memcpy(0x8000000000000000ULL + (u64) PAYLOAD_OFFSET,
                    (u64) payload_sky_430dex_bin,
@@ -259,9 +252,9 @@ void load_payload_430dex(int mode)
 
     remove_lv2_memcpy();
 
-    pokeq(0x80000000007EF000ULL, 0ULL);// BE Emu mount
+    pokeq(0x80000000007EF000ULL, 0ULL);// BD Emu mount
     pokeq(0x80000000007EF220ULL, 0ULL);
-
+/*
     //Patches from webMAN
     pokeq(0x800000000029E034ULL, 0x4E80002038600000ULL );
     pokeq(0x800000000029E03CULL, 0x7C6307B44E800020ULL ); // fix 8001003C error
@@ -272,7 +265,7 @@ void load_payload_430dex(int mode)
     pokeq(0x800000000005AB00ULL, 0x2F84000448000098ULL );
     pokeq(0x800000000005E4BCULL, 0x2F83000060000000ULL );
     pokeq(0x800000000005E4D0ULL, 0x2F83000060000000ULL );
-
+*/
 
     /* BASIC PATCHES SYS36 */
     // by 2 anonymous people
@@ -448,7 +441,6 @@ static int lv2_unpatch_bdvdemu_430dex(void)
         _poke32(UMOUNT_SYSCALL_OFFSET, 0xFBA100E8); // UMOUNT RESTORE
         usleep(1000);
     }
-
 
     pokeq(0x80000000007EF000ULL, 0ULL);
 

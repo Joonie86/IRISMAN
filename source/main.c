@@ -1,4 +1,4 @@
-﻿/*
+/*
     (c) 2011 Hermes/Estwald <www.elotrolado.net>
     IrisManager (HMANAGER port) (c) 2011 D_Skywalk <http://david.dantoine.org>
 
@@ -3541,6 +3541,15 @@ s32 main(s32 argc, const char* argv[])
         off_psid  = off_idps2 + 0x18ULL;
         payload_mode = is_payload_loaded_475();
     }
+    else if(is_firm_476())
+    {
+        firmware  = 0x476C;
+        //fw_ver    = 0xB98C;
+        off_idps  = 0x80000000003E2E30ULL;
+        off_idps2 = 0x8000000000474AF4ULL;
+        off_psid  = off_idps2 + 0x18ULL;
+        payload_mode = is_payload_loaded_475();
+    }	
     else if(is_firm_475dex())
     {
         firmware  = 0x475D;
@@ -4072,6 +4081,7 @@ s32 main(s32 argc, const char* argv[])
             }
             break;
         case 0x475C:
+		case 0x476C:
             set_bdvdemu_475(payload_mode);
             switch(payload_mode)
             {
