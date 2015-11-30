@@ -1,11 +1,11 @@
-// Defines for PS3 4.75 CEX
+// Defines for PS3 4.75
 #define strncmp                     0x4D86C // bytes matched: 0x80  2C2500004182005089640000892300005560063E7F895800409E00482F800000
 #define strcpy                      0x4D818 // bytes matched: 0x80  880400002F800000980300004D9E00207C691B788C0400012F8000009C090001
 #define strlen                      0x4D840 // bytes matched: 0x80  7C691B7838600000880900002F8000004D9E00207D234B788C0300012F800000
 #define alloc                       0x64824 // bytes matched: 0x80  2C2300007C85237838C000007C641B784D820020E9229EC8E86900004BFFFEB8
 #define free                        0x64C60 // bytes matched: 0x50  E9229EC87C85237838C000007C641B78E86900004BFFFBD0F821FF717C0802A6
 
-#define memory_patch_func           0x297660 // bytes matched: 0x80*  4BDB62552BA304203FE0800163FF0034409D002CE80100B07FE307B4EB410070
+#define memory_patch_func           0x297660 // bytes matched: 0x80*  4BDB61E12BA304203FE0800163FF0034409D002CE80100B07FE307B4EB410070
 //#define pathdup_from_user           0x1b1dc4
 #define open_mapping_table_ext      0x7fff00
 

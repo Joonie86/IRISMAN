@@ -22,6 +22,10 @@
 #include "firmware_symbols_355dex.h"
 #endif
 
+#ifdef CFW_355deh
+#include "firmware_symbols_355deh.h"
+#endif
+
 #ifdef CFW_421
 #include "firmware_symbols_421.h"
 #endif
@@ -121,11 +125,6 @@
 #ifdef CFW_475dex
 #include "firmware_symbols_475dex.h"
 #endif
-
-#ifdef CFW_476
-#include "firmware_symbols_476.h"
-#endif
-
 
 #define ABS(target) ((target) - (BASE2) - .)
 

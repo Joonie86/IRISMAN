@@ -49,6 +49,7 @@
 #include "payload341/payload_341.h"
 #include "payload355/payload_355.h"
 #include "payload355dex/payload_355dex.h"
+#include "payload355deh/payload_355deh.h"
 #include "payload421/payload_421.h"
 #include "payload421dex/payload_421dex.h"
 #include "payload430/payload_430.h"
@@ -3311,6 +3312,17 @@ s32 main(s32 argc, const char* argv[])
         off_psid  = off_idps2 + 0x18ULL;
         payload_mode = is_payload_loaded_355dex();
     }
+
+    else if(is_firm_355deh())
+    {
+        firmware  = 0x355E;
+        //fw_ver    = 0x8AAC;
+        off_idps  = 0x8000000000410F70ULL;
+        off_idps2 = 0x80000000004A2174ULL;
+        off_psid  = off_idps2 + 0x18ULL;
+        payload_mode = is_payload_loaded_355deh();
+    }
+
     else if(is_firm_421())
     {
         firmware  = 0x421C;
@@ -3682,6 +3694,42 @@ s32 main(s32 argc, const char* argv[])
                     break;
             }
             break;
+
+        case 0x355E: //355deh
+            set_bdvdemu_355deh(payload_mode);
+            switch(payload_mode)
+            {
+                case ZERO_PAYLOAD: //no payload installed
+                    install_new_poke_355deh();
+                    if (!map_lv1_355deh())
+                    {
+                        remove_new_poke_355deh();
+
+                        tiny3d_Init(1024*1024);
+                        ioPadInit(7);
+                        DrawDialogOK("Error Loading Payload: map failed?!");
+                        exit(0);
+                    }
+                    //patch_lv2_protection_355deh(); /* yaw */
+
+                    remove_new_poke_355deh(); /* restore pokes */
+                    unmap_lv1_355deh();  /* 3.55 need unmap? */
+                    __asm__("sync");
+
+                    load_payload_355deh(payload_mode);
+                    __asm__("sync");
+                    sleep(1); /* maybe need it, maybe not */
+
+                    if(!use_cobra && install_mamba)
+                    {
+                        use_mamba = load_ps3_mamba_payload();
+                    }
+                    break;
+                case SKY10_PAYLOAD:
+                    break;
+            }
+            break;
+
         case 0x421C:
             set_bdvdemu_421(payload_mode);
             switch(payload_mode)
