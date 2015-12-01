@@ -238,18 +238,24 @@ void load_payload_355deh(int mode)
     /* BASIC PATCHES SYS36 */
     // by 2 anonymous people
     _poke32(0x59CCC, 0x60000000);
-    _poke32(0x59CC4, 0x48000098);
+    PATCH_JUMP(0x059CD4, 0x59D6C);
     _poke32(0x7F6D4, 0x60000000);
     _poke32(0x7F6E8, 0x60000000);
     _poke(0x59C58, 0x63FF003D60000000);  // fix 8001003D error
-    _poke(0x59D1C, 0x3FE080013BE00000);  // fix 8001003E error
+    _poke32(0x59D20, 0x3BE00000);  // fix 8001003E error
 
-    PATCH_JUMP(0x2E3218, (PAYLOAD_OFFSET+0x30));
+    PATCH_JUMP(0x059D24, 0x59C30);
 
     /**  Rancid-o: Fix 0x8001003C error (incorrect version in sys_load_param) - It is present in the new game updates **/
     _poke(0x291798, 0x386000007C6307B4); // 0x8003026C3D600047ULL
     _poke32(0x291798 + 8, 0x4E800020);  //
 
+    /*
+        -002c3cf0  f8 01 00 b0 7c 9c 23 78  7c 7d 1b 78 4b d8 aa 1d  |....|.#x|}.xK...|
+        +002c3cf0  f8 01 00 b0 7c 9c 23 78  4b d4 01 88 4b d8 aa 1d  |....|.#xK...K...| (openhook jump - 0x3E80)
+    */
+
+    PATCH_JUMP(0x2E3218, (PAYLOAD_OFFSET+0x30));
 
 #ifdef CONFIG_USE_SYS8PERMH4
     PATCH_JUMP(PERMS_OFFSET, (PAYLOAD_OFFSET+0x18));
@@ -308,6 +314,16 @@ void unmap_lv1_355deh()
 	}
 }
 
+u64 lv2poke(u64 addr, u64 value);
+/*
+void patch_lv2_protection_355deh()
+{
+	lv2poke(HV_BASE_355DEH + 0x363a78, 0x0000000000000001ULL);
+	lv2poke(HV_BASE_355DEH + 0x363a80, 0xe0d251b556c59f05ULL);
+	lv2poke(HV_BASE_355DEH + 0x363a88, 0xc232fcad552c80d7ULL);
+	lv2poke(HV_BASE_355DEH + 0x363a90, 0x65140cd200000000ULL);
+}
+*/
 /******************************************************************************************************************************************************/
 /* STORAGE FUNCTIONS                                                                                                                                  */
 /******************************************************************************************************************************************************/
@@ -337,25 +353,25 @@ static int lv2_patch_storage_355deh(void)
     save_lv2_storage_patch= peekq(0x8000000000318008ULL);
     pokeq32(0x8000000000318008ULL, 0x40000000); 
 
-
-    regs_i.reg3 = 0x176388; regs_i.reg4 = 0x7f83e37860000000ULL;
+// LV1 Offsets
+    regs_i.reg3 = 0x1773b8; regs_i.reg4 = 0x7f83e37860000000ULL;
     regs_i.reg11 = 0xB6;
     sys8_lv1_syscall(&regs_i, &regs_o); save_lv1_storage_patches[0]= regs_o.reg4;
     regs_i.reg11 = 0xB7; sys8_lv1_syscall(&regs_i, &regs_o);
 
-    regs_i.reg3 = 0x1763ac; regs_i.reg4 = 0x7f85e37838600001ULL;
+    regs_i.reg3 = 0x1773dc; regs_i.reg4 = 0x7f85e37838600001ULL;
     regs_i.reg11 = 0xB6;
-    sys8_lv1_syscall(&regs_i, &regs_o); save_lv1_storage_patches[0]= regs_o.reg4;
+    sys8_lv1_syscall(&regs_i, &regs_o); save_lv1_storage_patches[1]= regs_o.reg4;
     regs_i.reg11 = 0xB7; sys8_lv1_syscall(&regs_i, &regs_o);
 
-    regs_i.reg3 = 0x176424; regs_i.reg4 = 0x7f84e3783be00001ULL;
+    regs_i.reg3 = 0x177454; regs_i.reg4 = 0x7f84e3783be00001ULL;
     regs_i.reg11 = 0xB6;
-    sys8_lv1_syscall(&regs_i, &regs_o); save_lv1_storage_patches[0]= regs_o.reg4;
+    sys8_lv1_syscall(&regs_i, &regs_o); save_lv1_storage_patches[2]= regs_o.reg4;
     regs_i.reg11 = 0xB7; sys8_lv1_syscall(&regs_i, &regs_o);
 
-    regs_i.reg3 = 0x17642c; regs_i.reg4 = 0x9be1007038600000ULL;
+    regs_i.reg3 = 0x17745c; regs_i.reg4 = 0x9be1007038600000ULL;
     regs_i.reg11 = 0xB6;
-    sys8_lv1_syscall(&regs_i, &regs_o); save_lv1_storage_patches[0]= regs_o.reg4;
+    sys8_lv1_syscall(&regs_i, &regs_o); save_lv1_storage_patches[3]= regs_o.reg4;
     regs_i.reg11 = 0xB7; sys8_lv1_syscall(&regs_i, &regs_o);
 	
 
@@ -375,20 +391,21 @@ static int lv2_unpatch_storage_355deh(void)
     pokeq(0x8000000000318008ULL, save_lv2_storage_patch); 
 
     regs_i.reg11 = 0xB7;
-
-    regs_i.reg3 = 0x176388; regs_i.reg4 = save_lv1_storage_patches[0];
+// LV1 Offsets
+    regs_i.reg3 = 0x1773B8; regs_i.reg4 = save_lv1_storage_patches[0];
     sys8_lv1_syscall(&regs_i, &regs_o);
 
-    regs_i.reg3 = 0x1763ac; regs_i.reg4 = save_lv1_storage_patches[1];
+    regs_i.reg3 = 0x1773dc; regs_i.reg4 = save_lv1_storage_patches[1];
     sys8_lv1_syscall(&regs_i, &regs_o);
 
-    regs_i.reg3 = 0x176424; regs_i.reg4 = save_lv1_storage_patches[2];
+    regs_i.reg3 = 0x177454; regs_i.reg4 = save_lv1_storage_patches[2];
     sys8_lv1_syscall(&regs_i, &regs_o);
 
-    regs_i.reg3 = 0x17642c; regs_i.reg4 = save_lv1_storage_patches[3];
+    regs_i.reg3 = 0x17745c; regs_i.reg4 = save_lv1_storage_patches[3];
     sys8_lv1_syscall(&regs_i, &regs_o);
 
     return 0;
+
 }
 
 
