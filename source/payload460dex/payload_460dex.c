@@ -9,11 +9,15 @@
  * Estwald
  * Rancid-o
  * Evilnat
- *
+ * Joonie
+ * Aldostools
+ * Smhabib
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 3 of the License.
  */
+
+// Joonie's port 4.60 DEX
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -40,15 +44,14 @@
 
 #define SYSCALL_BASE                    0x800000000038A120ULL //done
 #define NEW_POKE_SYSCALL                813
-#define NEW_POKE_SYSCALL_ADDR           0x80000000001AD3ECULL //done // where above syscall is in lv2
+#define NEW_POKE_SYSCALL_ADDR           0x80000000001AD3ECULL // syscall_rmdir (813)
 
 #define PAYLOAD_OFFSET                  0x3d90
 #define PERMS_OFFSET                    0x3560
 
 #define PAYLOAD_UMOUNT_OFFSET           (0x3d90+0x400)
-#define UMOUNT_SYSCALL_OFFSET           (0x1A5654 + 0x8) // SYSCALL (838) fixed by zar //former offet by Habib (0x1B480 +0x8) // SYSCALL (838)
-
-#define LV2MOUNTADDR_460dex 0x800000000031A2E8ULL //done
+#define UMOUNT_SYSCALL_OFFSET           (0x1ABB04 + 0x8) // SYSCALL (838) 
+#define LV2MOUNTADDR_460dex 0x80000000004A36D0ULL //done
 //0xff0 => 0x116c (458098 - 459204)
 #define LV2MOUNTADDR_460dex_ESIZE 0x118
 #define LV2MOUNTADDR_460dex_CSIZE 0x108
@@ -71,10 +74,6 @@ static int poke_syscall = 7;
 
 extern char path_name[MAXPATHLEN];
 extern char temp_buffer[8192];
-
-extern u8 bEnableLv2_memprot_patch;
-extern u8 bEnableLv2_webman_patch;
-extern u8 bEnableLv2_habib_patch;
 
 static u64 peekq(u64 addr)
 {
@@ -103,7 +102,6 @@ static inline void _poke32(u64 addr, uint32_t val)
 {
     pokeq32(0x8000000000000000ULL + addr, val);
 }
-
 int is_firm_460dex(void)
 {
     // TOC 4.60
@@ -180,10 +178,6 @@ static inline void lv2_memset( u64 dst, const u64 val, size_t sz)
 -- 4.30   NEW_POKE_SYSCALL_ADDR
 001B6950  F8 21 FF 01 7C 08 02 A6  FB C1 00 F0 FB E1 00 F8
 001B6960  EB C2 FE 88 7C 7F 1B 78  38 60 03 2D FB A1 00 E8
-
--- 4.60   NEW_POKE_SYSCALL_ADDR
-001A6F3C  F8 21 FF 01 7C 08 02 A6  FB C1 00 F0 FB E1 00 F8
-001A6F4C  EB C2 FE 10 7C 7F 1B 78  38 60 03 2D FB A1 00 E8
 */
 
 static inline void install_lv2_memcpy()
@@ -212,7 +206,7 @@ static inline void remove_lv2_memcpy()
     for(n = 0; n < 50; n++) {
     /* restore syscall */
     //remove_new_poke();
-
+// @1AD3EC
         pokeq(NEW_POKE_SYSCALL_ADDR     , 0xF821FF017C0802A6ULL);
         pokeq(NEW_POKE_SYSCALL_ADDR + 8 , 0xFBC100F0FBE100F8ULL);
         pokeq(NEW_POKE_SYSCALL_ADDR + 16, 0xEBC2FF407C7F1B78ULL);
@@ -221,24 +215,23 @@ static inline void remove_lv2_memcpy()
     }
 }
 
-
+/*
 static u64 lv1poke(u64 addr, u64 value)
 {
     lv2syscall2(9, (u64) addr, (u64) value);
     return_to_user_prog(u64);
 }
-
+*/
 
 void load_payload_460dex(int mode)
 {
-    if(bEnableLv2_memprot_patch) // changed offset: 0x377828 -> 0x370F28
-    {   //Remove Lv2 memory protection
+/*       
+//Remove Lv2 memory protection
         lv1poke(0x370F28     , 0x0000000000000001ULL); // Original: 0x0000000000351FD8ULL
         lv1poke(0x370F28 + 8 , 0xE0D251B556C59F05ULL); // Original: 0x3B5B965B020AE21AULL
         lv1poke(0x370F28 + 16, 0xC232FCAD552C80D7ULL); // Original: 0x7D6F60B118E2E81BULL
         lv1poke(0x370F28 + 24, 0x65140CD200000000ULL); // Original: 0x315D8B7700000000ULL
-    }
-
+*/    
     install_lv2_memcpy();
     /* WARNING!! It supports only payload with a size multiple of 8 */
     lv2_memcpy(0x8000000000000000ULL + (u64) PAYLOAD_OFFSET,
@@ -271,72 +264,10 @@ void load_payload_460dex(int mode)
     pokeq(0x80000000007EF220ULL, 0ULL);
 
     //Patches from webMAN
-    if(bEnableLv2_webman_patch)
-    {
-        pokeq(0x80000000002A7224ULL, 0x4E80002038600000ULL ); // fix 8001003C error  Original: 0x4E80002038600000ULL
-        pokeq(0x80000000002A722CULL, 0x7C6307B44E800020ULL ); // fix 8001003C error  Original: 0x7C6307B44E800020ULL
-        pokeq(0x8000000000059F58ULL, 0x63FF003D60000000ULL ); // fix 8001003D error  Original: 0x63FF003D419EFFD4ULL
-        pokeq(0x800000000005A01CULL, 0x3FE080013BE00000ULL ); // fix 8001003E error  Original: 0x3FE0800163FF003EULL
+	pokeq(0x8000000000059BFCULL, 0x386000012F830000ULL ); // ignore LIC.DAT check
+	pokeq(0x80000000002367C4ULL, 0x38600000F8690000ULL ); // fix 0x8001002B / 80010017 errors (ported for DEX 2015-01-03)
 
-        pokeq(0x8000000000059FC8ULL, 0x419E00D860000000ULL ); // Original: 0x419E00D8419D00C0ULL
-        pokeq(0x8000000000059FD0ULL, 0x2F84000448000098ULL ); // Original: 0x2F840004409C0048ULL //PATCH_JUMP
-        pokeq(0x800000000005E024ULL, 0x2F83000060000000ULL ); // fix 80010009 error  Original: 0x2F830000419E00ACULL
-        pokeq(0x800000000005E038ULL, 0x2F83000060000000ULL ); // fix 80010019 error  Original: 0x2F830000419E00ACULL
 
-		pokeq(0x8000000000059BFCULL, 0x386000012F830000ULL ); // ignore LIC.DAT check
-		pokeq(0x80000000002367C4ULL, 0x38600000F8690000ULL ); // fix 0x8001002B / 80010017 errors (ported for DEX 2015-01-03)
-
-		pokeq(0x8000000000059628ULL, 0xF821FE917C0802A6ULL ); // just restore the original
-		pokeq(0x800000000005C77CULL, 0x419E0038E8610098ULL ); // just restore the original
-
-    }
-/*
-    //Patches by Habib ported to 4.60 (habib_patch = 2 (default) //0=disabled, 1=new patch, 2=new patch except 4.65 Habib Cobra, 3=old patch, 4=no boot speedup patch)
-    if(bEnableLv2_habib_patch == 2 && is_cobra_based() && file_exists("/dev_flash/habib")) ;
-    else if((bEnableLv2_habib_patch == 11) || (bEnableLv2_habib_patch == 2))
-    { // enable new habib patches
-        pokeq(0x8000000000058DACULL +  0, 0x60000000E8610098ULL);
-        pokeq(0x8000000000058DACULL +  8, 0x2FA30000419E000CULL);
-        pokeq(0x8000000000058DACULL + 16, 0x388000334800BE15ULL);
-        pokeq(0x8000000000058DACULL + 24, 0xE80100F07FE307B4ULL);
-
-        pokeq(0x8000000000055C5CULL +  0, 0x386000004E800020ULL);
-        pokeq(0x8000000000055C5CULL +  8, 0xFBC10160FBE10168ULL);
-        pokeq(0x8000000000055C5CULL + 16, 0xFB610148FB810150ULL);
-        pokeq(0x8000000000055C5CULL + 24, 0xFBA10158F8010180ULL);
-    }
-    else if(bEnableLv2_habib_patch == 10)
-    { // disable new habib patches
-        pokeq(0x8000000000058DACULL +  0, 0x419E0038E8610098ULL);
-        pokeq(0x8000000000058DACULL +  8, 0x2FA30000419E000CULL);
-        pokeq(0x8000000000058DACULL + 16, 0x388000334800BE15ULL);
-        pokeq(0x8000000000058DACULL + 24, 0xE80100F07FE307B4ULL);
-
-        pokeq(0x8000000000055C5CULL +  0, 0xF821FE917C0802A6ULL);
-        pokeq(0x8000000000055C5CULL +  8, 0xFBC10160FBE10168ULL);
-        pokeq(0x8000000000055C5CULL + 16, 0xFB610148FB810150ULL);
-        pokeq(0x8000000000055C5CULL + 24, 0xFBA10158F8010180ULL);
-    }
-    else
-    {
-        if(bEnableLv2_habib_patch >= 1)
-        {
-            if(bEnableLv2_habib_patch == 3)
-                pokeq32(0x8000000000058DACULL, 0x60000000);          // old fix 0x80010017 error  Original: 0x7C7F1B78419E0038ULL
-            else
-                pokeq(0x80000000002A1054ULL, 0x386000014E800020ULL); // fix 0x80010017 error   Original: 0xFBC1FFF0EBC225B0ULL
-
-            // Booting of game discs and backups speed increased
-            if(bEnableLv2_habib_patch != 4)
-            {
-                pokeq32(0x8000000000058DA0ULL, 0x38600001);
-                pokeq32(0x800000000005A96CULL, 0x38600000);
-            }
-
-            pokeq(0x8000000000055C58ULL, 0x386000004E800020ULL);     // fix 0x8001002B error   Original: 0xF821FE917C0802A6ULL
-        }
-    }
-*/
     /* BASIC PATCHES SYS36 */
     // by 2 anonymous people
     _poke32(0x59FCC, 0x60000000);          // Original: 0x419E00D8419D00C0ULL -> 0x419E00D860000000ULL
@@ -394,6 +325,7 @@ static int lv2_patch_storage_460dex(void)
     // LV2 enable syscall storage
     save_lv2_storage_patch= peekq(0x800000000030E450ULL);
     pokeq32(0x800000000030E450ULL, 0x40000000);
+
 
     regs_i.reg3 = 0x16fa60; regs_i.reg4 = 0x7f83e37860000000ULL;
     regs_i.reg11 = 0xB6;
