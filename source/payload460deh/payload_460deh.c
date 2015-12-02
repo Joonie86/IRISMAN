@@ -269,8 +269,8 @@ void load_payload_460deh(int mode)
 	
     /* BASIC PATCHES SYS36 */
     // by 2 anonymous people
-    _poke32(0x565FC, 0x60000000);          // Original: 0x419E00D8419D00C0ULL -> 0x419E00D860000000ULL
-    PATCH_JUMP(0x56604, 0x5669C);          // Original: 0x2F840004409C0048ULL -> 0x2F84000448000098ULL
+    _poke32(0x5A3B4, 0x60000000);          // Original: 0x419E00D8419D00C0ULL -> 0x419E00D860000000ULL
+    PATCH_JUMP(0x5A3BC, 0x5A454);          // Original: 0x2F840004409C0048ULL -> 0x2F84000448000098ULL
     _poke32(0x5E410, 0x60000000);         // fix 80010009 error
     _poke32(0x5E424, 0x60000000);         // fix 80010019 error
     _poke(0x5A340, 0x63FF003D60000000); // fix 8001003D error  "ori     %r31, %r31, 0x3D\n nop\n" done
