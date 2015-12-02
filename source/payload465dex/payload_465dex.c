@@ -283,9 +283,6 @@ void load_payload_465dex (int mode)
     pokeq(0x80000000007EF220ULL, 0ULL);
 
     //Patches from webMAN
-    if(bEnableLv2_webman_patch)
-    {
-		//patches by deank
 		pokeq(0x80000000002764F8ULL, 0x4E80002038600000ULL ); // fix 8001003C error  Original: 0x4E80002038600000ULL
 		pokeq(0x8000000000276500ULL, 0x7C6307B44E800020ULL ); // fix 8001003C error  Original: 0x7C6307B44E800020ULL
 		pokeq(0x8000000000059F5CULL, 0x63FF003D60000000ULL ); // fix 8001003D error  Original: 0x63FF003D419EFFD4ULL
@@ -301,66 +298,6 @@ void load_payload_465dex (int mode)
 
 		pokeq(0x800000000005962CULL, 0xF821FE917C0802A6ULL ); // just restore the original
 		pokeq(0x800000000005C780ULL, 0x419E0038E8610098ULL ); // just restore the original
-
-/*
-        if(file_exists("/dev_flash/rebug")==false || bEnableLv2_webman_patch==3)
-        {
-            //anti-ode patches by deank
-            //pokeq(0x800000000005962CULL, 0xF821FE917C0802A6ULL ); //replaced by deank's patch (2015-01-03)
-            pokeq(0x8000000000059654ULL, 0x6000000060000000ULL );
-            pokeq(0x800000000005965CULL, 0x600000003BA00000ULL );
-        }
-
-        pokeq(0x800000000005C780ULL, 0x60000000E8610098ULL );
-*/
-        if(bEnableLv2_webman_patch>=2 || bEnableLv2_habib_patch == 2) bEnableLv2_habib_patch=0;
-    }
-
-    if((bEnableLv2_habib_patch == 11) || (bEnableLv2_habib_patch == 2))
-    { // enable new patches
-        pokeq(0x800000000005C780ULL + 0x00, 0x60000000E8610098ULL);
-        pokeq(0x800000000005C780ULL + 0x08, 0x2FA30000419E000CULL);
-        pokeq(0x800000000005C780ULL + 0x10, 0x388000334800BE15ULL);
-        pokeq(0x800000000005C780ULL + 0x18, 0xE80100F07FE307B4ULL);
-
-        pokeq(0x800000000005962CULL + 0x00, 0x386000004E800020ULL);
-        pokeq(0x800000000005962CULL + 0x08, 0xFBC10160FBE10168ULL);
-        pokeq(0x800000000005962CULL + 0x10, 0xFB610148FB810150ULL);
-        pokeq(0x800000000005962CULL + 0x18, 0xFBA10158F8010180ULL);
-    }
-    else if(bEnableLv2_habib_patch == 10)
-    { // disable new patches
-        pokeq(0x800000000005C780ULL + 0x00, 0x419E0038E8610098ULL);
-        pokeq(0x800000000005C780ULL + 0x08, 0x2FA30000419E000CULL);
-        pokeq(0x800000000005C780ULL + 0x10, 0x388000334800BE15ULL);
-        pokeq(0x800000000005C780ULL + 0x18, 0xE80100F07FE307B4ULL);
-
-        pokeq(0x800000000005962CULL + 0x00, 0xF821FE917C0802A6ULL);
-        pokeq(0x800000000005962CULL + 0x08, 0xFBC10160FBE10168ULL);
-        pokeq(0x800000000005962CULL + 0x10, 0xFB610148FB810150ULL);
-        pokeq(0x800000000005962CULL + 0x18, 0xFBA10158F8010180ULL);
-    }
-    else
-    {
-        //Patches by Habib ported to 4.65 (habib_patch = 2 (default) //0=disabled, 1=new patch, 2=new patch except 4.65 Habib Cobra, 3=old patch, 4=no boot speedup patch)
-        if(bEnableLv2_habib_patch == 2 && is_cobra_based() && file_exists("/dev_flash/habib")) ; else
-        if(bEnableLv2_habib_patch >= 1)
-        {
-            if(bEnableLv2_habib_patch == 3)
-                pokeq32(0x800000000005C780ULL, 0x60000000);          // old fix 0x80010017 error  Original: 0x7C7F1B78419E0038ULL
-            else
-                pokeq(0x80000000002BBED0ULL, 0x386000014E800020ULL); // fix 0x80010017 error   Original: 0xFBC1FFF0EBC225B0ULL
-
-            // Booting of game discs and backups speed increased
-            if(bEnableLv2_habib_patch != 4)
-            {
-                pokeq32(0x800000000005C774ULL, 0x38600001);
-                pokeq32(0x800000000005E340ULL, 0x38600000);
-            }
-
-            pokeq(0x800000000005962CULL, 0x386000004E800020ULL);     // fix 0x8001002B error   Original: 0xF821FE917C0802A6ULL
-        }
-    }
 
     /* BASIC PATCHES SYS36 */
     // by 2 anonymous people

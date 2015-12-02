@@ -122,6 +122,10 @@
 #include "firmware_symbols_460dex.h"
 #endif
 
+#ifdef CFW_460deh
+#include "firmware_symbols_460deh.h"
+#endif
+
 #ifdef CFW_465
 #include "firmware_symbols_465.h"
 #endif

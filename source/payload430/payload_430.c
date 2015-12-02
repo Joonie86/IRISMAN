@@ -362,7 +362,7 @@ static int lv2_unpatch_storage_430(void)
     pokeq(0x80000000002E9218ULL, save_lv2_storage_patch);
 
     regs_i.reg11 = 0xB7;
-
+    // LV1 offsets
     regs_i.reg3 = 0x16fa60; regs_i.reg4 = save_lv1_storage_patches[0];
     sys8_lv1_syscall(&regs_i, &regs_o);
 

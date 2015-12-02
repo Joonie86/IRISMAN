@@ -359,7 +359,7 @@ static int lv2_patch_storage_355dex(void)
     save_lv2_storage_patch= peekq(0x80000000002EF270ULL);
     pokeq32(0x80000000002EF270ULL, 0x40000000);
 
-
+// LV1 Offsets
     regs_i.reg3 = 0x16f3b8; regs_i.reg4 = 0x7f83e37860000000ULL;
     regs_i.reg11 = 0xB6;
     sys8_lv1_syscall(&regs_i, &regs_o); save_lv1_storage_patches[0]= regs_o.reg4;
@@ -397,7 +397,7 @@ static int lv2_unpatch_storage_355dex(void)
     pokeq(0x80000000002EF270ULL, save_lv2_storage_patch);
 
     regs_i.reg11 = 0xB7;
-
+// LV1 Offsets
     regs_i.reg3 = 0x16f3b8; regs_i.reg4 = save_lv1_storage_patches[0];
     sys8_lv1_syscall(&regs_i, &regs_o);
 

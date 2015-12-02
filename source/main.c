@@ -68,6 +68,7 @@
 #include "payload455dex/payload_455dex.h"
 #include "payload460/payload_460.h"
 #include "payload460dex/payload_460dex.h"
+#include "payload460deh/payload_460deh.h"
 #include "payload465/payload_465.h"
 #include "payload465dex/payload_465dex.h"
 #include "payload470/payload_470.h"
@@ -3489,7 +3490,15 @@ s32 main(s32 argc, const char* argv[])
         off_psid  = off_idps2 + 0x18ULL;
         payload_mode = is_payload_loaded_460dex();
     }
-
+	else if(is_firm_460deh())
+    {
+        firmware  = 0x460E;
+        //fw_ver    = 0xB798;
+        off_idps  = 0x8000000000432430ULL;
+        off_idps2 = 0x80000000004C4F18ULL;
+        off_psid  = off_idps2 + 0x18ULL;
+        payload_mode = is_payload_loaded_460deh();
+    }
     else if(is_firm_465())
     {
         firmware  = 0x465C;
@@ -4054,6 +4063,26 @@ s32 main(s32 argc, const char* argv[])
                     break;
             }
             break;
+
+		case 0x460E:
+            set_bdvdemu_460deh(payload_mode);
+            switch(payload_mode)
+            {
+                case ZERO_PAYLOAD: //no payload installed
+                    load_payload_460deh(payload_mode);
+                    __asm__("sync");
+                    sleep(1); /* maybe need it, maybe not */
+
+                    if(!use_cobra && install_mamba)
+                    {
+                        use_mamba = load_ps3_mamba_payload();
+                    }
+                    break;
+                case SKY10_PAYLOAD:
+                    break;
+            }
+            break;
+
         case 0x465C:
         case 0x466C:
             set_bdvdemu_465(payload_mode);
@@ -11837,8 +11866,8 @@ void draw_gbloptions(float x, float y)
                 }
             }
         }
-        else
-            DrawFormatString(0, y2 - 28, "%x%s  -  %s", firmware>>4, (firmware & 0xF) == 0xD ? "DEX": "CEX", payload_str);
+         else
+            DrawFormatString(0, y2 - 28, "%x%s  -  %s", ((firmware>>4) & 0xFFFF), ((firmware & 0xF) == 0xE ? "DEH": (firmware & 0xF) == 0xD ? "DEX": "CEX"), payload_str);
     }
 
     SetFontAutoCenter(0);
@@ -13470,7 +13499,7 @@ void draw_console_id_tools(float x, float y)
     SetFontSize(18, 20);
     SetFontAutoCenter(1);
 
-    DrawFormatString(0, y2 - 28, "%x%s  -  %s", firmware>>4, (firmware & 0xF) == 0xD ? "DEX": "CEX", payload_str);
+     DrawFormatString(0, y2 - 28, "%x%s  -  %s", ((firmware>>4) & 0xFFFF), ((firmware & 0xF) == 0xE ? "DEH": (firmware & 0xF) == 0xD ? "DEX": "CEX"), payload_str);
 
 
     SetFontAutoCenter(0);
