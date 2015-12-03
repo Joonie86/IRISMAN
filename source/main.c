@@ -4063,7 +4063,6 @@ s32 main(s32 argc, const char* argv[])
                     break;
             }
             break;
-
 		case 0x460E:
             set_bdvdemu_460deh(payload_mode);
             switch(payload_mode)

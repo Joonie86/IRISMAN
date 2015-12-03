@@ -318,17 +318,10 @@ u64 lv2poke(u64 addr, u64 value);
 /*
 void patch_lv2_protection_355deh()
 {
-<<<<<<< HEAD
 	lv2poke(HV_BASE_355DEX + 0x363a78, 0x0000000000000001ULL);
 	lv2poke(HV_BASE_355DEX + 0x363a80, 0xe0d251b556c59f05ULL);
 	lv2poke(HV_BASE_355DEX + 0x363a88, 0xc232fcad552c80d7ULL);
 	lv2poke(HV_BASE_355DEX + 0x363a90, 0x65140cd200000000ULL);
-=======
-	lv2poke(HV_BASE_355DEH + 0x363a78, 0x0000000000000001ULL);
-	lv2poke(HV_BASE_355DEH + 0x363a80, 0xe0d251b556c59f05ULL);
-	lv2poke(HV_BASE_355DEH + 0x363a88, 0xc232fcad552c80d7ULL);
-	lv2poke(HV_BASE_355DEH + 0x363a90, 0x65140cd200000000ULL);
->>>>>>> origin/master
 }
 */
 /******************************************************************************************************************************************************/

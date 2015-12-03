@@ -61,9 +61,6 @@ extern u64 restore_syscall8[2];
 #define PATCH_JUMP(add_orig, add_dest) _poke32(add_orig, 0x48000000 | ((add_dest-add_orig) & 0x3fffffc))
 #define PATCH_CALL(add_orig, add_dest) _poke32(add_orig, 0x48000000 | ((add_dest-add_orig) & 0x3fffffc) | 1)
 
-bool file_exists( char* path );
-int is_cobra_based(void);
-
 static int lv2_unpatch_bdvdemu_460deh(void);
 static int lv2_patch_bdvdemu_460deh(uint32_t flags);
 static int lv2_patch_storage_460deh(void);
@@ -271,12 +268,12 @@ void load_payload_460deh(int mode)
     // by 2 anonymous people
     _poke32(0x5A3B4, 0x60000000);          // Original: 0x419E00D8419D00C0ULL -> 0x419E00D860000000ULL
     PATCH_JUMP(0x5A3BC, 0x5A454);          // Original: 0x2F840004409C0048ULL -> 0x2F84000448000098ULL
-    _poke32(0x5E410, 0x60000000);         // fix 80010009 error
-    _poke32(0x5E424, 0x60000000);         // fix 80010019 error
-    _poke(0x5A340, 0x63FF003D60000000); // fix 8001003D error  "ori     %r31, %r31, 0x3D\n nop\n" done
-    _poke32(0x5A408, 0x3BE00000);         // fix 8001003E error -- 4.60 DEH ok in 0x055F64 "ori    r31, r31, 0x3E # 0x8001003E"  done
+    _poke32(0x05E410, 0x60000000);         // fix 80010009 error
+    _poke32(0x05E424, 0x60000000);         // fix 80010019 error
+    _poke(  0x05A340, 0x63FF003D60000000); // fix 8001003D error  "ori     %r31, %r31, 0x3D\n nop\n" done
+    _poke32(0x05A408, 0x3BE00000);         // fix 8001003E error -- 4.60 DEH ok in 0x055F64 "ori    r31, r31, 0x3E # 0x8001003E"  done
 
-    PATCH_JUMP(0x5A40C, 0x5A318);          // Not present in rebug, anyway..
+    //PATCH_JUMP(0x5A40C, 0x5A318);          // Not present in rebug, anyway..
 
     _poke(0x2771BC, 0x386000007C6307B4); //fix 8001003C error
     _poke32(0x2771BC + 8, 0x4E800020);   //
@@ -287,7 +284,7 @@ void load_payload_460deh(int mode)
     */
 
     PATCH_JUMP(0x2D1488, (PAYLOAD_OFFSET+0x30)); // patch openhook - done
-    _poke32(0x2D1464, 0xF821FF61); // free openhook Rogero 4.30 (put "stdu    %sp, -0xA0(%sp)" instead   "b       sub_2E9F98")
+    //_poke32(0x2D1464, 0xF821FF61); // free openhook Rogero 4.30 (put "stdu    %sp, -0xA0(%sp)" instead   "b       sub_2E9F98")
 
 #ifdef CONFIG_USE_SYS8PERMH4
     PATCH_JUMP(PERMS_OFFSET, (PAYLOAD_OFFSET+0x18));

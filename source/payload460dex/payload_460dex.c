@@ -18,8 +18,6 @@
  */
 // Joonie's port 4.60 DEX
 
-// Joonie's port 4.60 DEX
-
 #include <stdio.h>
 #include <stdbool.h>
 #include <malloc.h>
@@ -51,11 +49,7 @@
 #define PERMS_OFFSET                    0x3560
 
 #define PAYLOAD_UMOUNT_OFFSET           (0x3d90+0x400)
-<<<<<<< HEAD
 #define UMOUNT_SYSCALL_OFFSET           (0x1ABB04 + 0x8) // SYSCALL (838) syscall_sys_fs_unmount
-=======
-#define UMOUNT_SYSCALL_OFFSET           (0x1ABB04 + 0x8) // SYSCALL (838) 
->>>>>>> origin/master
 #define LV2MOUNTADDR_460dex 0x80000000004A36D0ULL //done
 //0xff0 => 0x116c (458098 - 459204)
 #define LV2MOUNTADDR_460dex_ESIZE 0x118
