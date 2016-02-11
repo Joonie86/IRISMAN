@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Language IrisManager by D_Skywalk
  *
  * Copyright (c) 2011 David Colmenero Aka D_Skywalk
@@ -331,7 +331,7 @@ t_lngstr lang_strings[] =
     { GAMELIST_STATUS2,   "GAMELIST_STATUS2"   , "X  Select Game List mode             O  Go Back" },
     { GAMELIST_SCANNING0, "GAMELIST_SCANNING0" , "Scanning all games..." },
     { GAMELIST_SCANNING1, "GAMELIST_SCANNING1" , "Scanning PS3 games..." },
-    { GAMELIST_SCANNING2, "GAMELIST_SCANNING2" , "Scanning PlayStationÂ® games..." },
+    { GAMELIST_SCANNING2, "GAMELIST_SCANNING2" , "Scanning PlayStation® games..." },
     { GAMELIST_SCANNING3, "GAMELIST_SCANNING3" , "Scanning Videos..." },
     { GAMELIST_SCANNING4, "GAMELIST_SCANNING4" , "Scanning Retro games..." },
     { GAMELIST_SCANNING5, "GAMELIST_SCANNING5" , "Scanning network games (webMAN)..." },
@@ -515,7 +515,7 @@ int get_system_language(void)
                 break;
             }
 
-            //Non Ã¨ uguale, avanzo l'offset da entry_name di 4 e leggo lunghezza data
+            //Non è uguale, avanzo l'offset da entry_name di 4 e leggo lunghezza data
             u16 len_data = 0;
             entry_name += 4;
             sysFsLseek( reg, (s64)entry_name, 0, &pos );

@@ -2457,6 +2457,7 @@ void psx_launch(void)
         videoConfigure(0, &vconfig, NULL, 0);
     }
 
+    unlink_secure("/dev_hdd0/tmp/wm_request");
     fun_exit();
 
     if((psx_options.flags & 0x1) == 0)
@@ -3110,7 +3111,7 @@ void copy_PSX_game_from_CD()
 
     if(aborted)
     {
-        if(DrawDialogYesNo("Do you want to delete all datas copied?") == YES)
+        if((disc > 1) && DrawDialogYesNo("Do you want to delete all discs copied to hdd?") == YES)
         {
             sprintf(temp_buffer + 1024, "/dev_hdd0/PSXGAMES/%s", temp_buffer);
             DeleteDirectory(temp_buffer + 1024);

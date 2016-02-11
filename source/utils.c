@@ -44,6 +44,8 @@ Credits:
 
 #define cue_buf  plugin_args
 
+#define MAX_PATH_LEN 0x420
+
 enum DiscEmu
 {
 	EMU_OFF = 0,
@@ -90,7 +92,7 @@ uint32_t sections[MAX_SECTIONS], sections_size[MAX_SECTIONS];
 
 rawseciso_args *p_args;
 
-char ntfs_path[0x420];
+char ntfs_path[MAX_PATH_LEN];
 
 int cobra_parse_cue(void *cue, uint32_t size, TrackDef *tracks, unsigned int max_tracks, unsigned int *num_tracks, char *filename, unsigned int fn_size);
 //--
@@ -121,6 +123,7 @@ extern int retro_mode;
 extern int roms_count;
 extern int max_roms;
 
+// retroArch cores 1.0
 extern char retro_root_path[ROMS_MAXPATHLEN];
 extern char retro_snes_path[ROMS_MAXPATHLEN];
 extern char retro_gba_path[ROMS_MAXPATHLEN];
@@ -137,6 +140,13 @@ extern char retro_atari_path[ROMS_MAXPATHLEN];
 extern char retro_vb_path[ROMS_MAXPATHLEN];
 extern char retro_nxe_path[ROMS_MAXPATHLEN];
 extern char retro_wswan_path[ROMS_MAXPATHLEN];
+
+// retroArch cores 1.2
+extern char retro_a7800_path[ROMS_MAXPATHLEN];
+extern char retro_lynx_path[ROMS_MAXPATHLEN];
+extern char retro_gw_path[ROMS_MAXPATHLEN];
+extern char retro_vectrex_path[ROMS_MAXPATHLEN];
+extern char retro_2048_path[ROMS_MAXPATHLEN];
 
 //void UTF8_to_Ansi(char *utf8, char *ansi, int len); // from osk_input
 void UTF32_to_UTF8(u32 *stw, u8 *stb);
@@ -712,7 +722,7 @@ int edit_title_param_sfo(char * file)
 
     bool more = false;
 
-    char sfo[0x420]; // sfo path + file name
+    char sfo[MAX_PATH_LEN]; // sfo path + file name
 
     char title_name[64];
 
@@ -1025,7 +1035,7 @@ int parse_iso_titleid(char * path_iso, char * title_id)
 
     while(pos < len)
     {
-        if(mem[pos + 8] == 0x2E)
+        if(mem[pos] == 'S' && mem[pos + 8] == '.')
         {
             if(!strncmp((char *) &mem[pos], "SLUS_", 5))
             {
@@ -1063,14 +1073,77 @@ int parse_iso_titleid(char * path_iso, char * title_id)
                 flag = SUCCESS;
                 pos = len;
             }
+            else if(!strncmp((char *) &mem[pos], "SCPM_", 5))
+            {
+                memcpy(title_id, (char *) &mem[pos], 11);
+                flag = SUCCESS;
+                pos = len;
+            }
             else if(!strncmp((char *) &mem[pos], "SCPS_", 5))
             {
                 memcpy(title_id, (char *) &mem[pos], 11);
                 flag = SUCCESS;
                 pos = len;
             }
+            else if(!strncmp((char *) &mem[pos], "SIPS_", 5))
+            {
+                memcpy(title_id, (char *) &mem[pos], 11);
+                flag = SUCCESS;
+                pos = len;
+            }
+            else if(!strncmp((char *) &mem[pos], "SCPS_", 5))
+            {
+                memcpy(title_id, (char *) &mem[pos], 11);
+                flag = SUCCESS;
+                pos = len;
+            }
+            else if(!strncmp((char *) &mem[pos], "SLUD_", 5))
+            {
+                memcpy(title_id, (char *) &mem[pos], 11);
+                flag = SUCCESS;
+                pos = len;
+            }
+            else if(!strncmp((char *) &mem[pos], "SCUD_", 5))
+            {
+                memcpy(title_id, (char *) &mem[pos], 11);
+                flag = SUCCESS;
+                pos = len;
+            }
+            else if(!strncmp((char *) &mem[pos], "SLED_", 5))
+            {
+                memcpy(title_id, (char *) &mem[pos], 11);
+                flag = SUCCESS;
+                pos = len;
+            }
+            else if(!strncmp((char *) &mem[pos], "SCED_", 5))
+            {
+                memcpy(title_id, (char *) &mem[pos], 11);
+                flag = SUCCESS;
+                pos = len;
+            }
         }
-        else if(mem[pos] == 0x4E)
+        else if(mem[pos] == 'P' && mem[pos + 8] == '.')
+        {
+            if(!strncmp((char *) &mem[pos], "PAPX_", 5))
+            {
+                memcpy(title_id, (char *) &mem[pos], 11);
+                flag = SUCCESS;
+                pos = len;
+            }
+            else if(!strncmp((char *) &mem[pos], "PBPX_", 5))
+            {
+                memcpy(title_id, (char *) &mem[pos], 11);
+                flag = SUCCESS;
+                pos = len;
+            }
+            else if(!strncmp((char *) &mem[pos], "PCPX_", 5))
+            {
+                memcpy(title_id, (char *) &mem[pos], 11);
+                flag = SUCCESS;
+                pos = len;
+            }
+        }
+        else if(mem[pos] == 'N' && mem[pos + 1] == 'P')
         {
             if(!strncmp((char *) &mem[pos], "NPUZ", 4))
             {
@@ -1121,7 +1194,7 @@ int parse_iso_titleid(char * path_iso, char * title_id)
                 pos = len;
             }
         }
-        else if(mem[pos] == 0x55)
+        else if(mem[pos] == 'U')
         {
             if(!strncmp((char *) &mem[pos], "ULUS", 4))
             {
@@ -1275,10 +1348,10 @@ int patch_exe_error_09(char *path_exe)
     if(is_ntfs_path(path_exe)) return 0;
 
     u16 fw_421 = 42100;
-    u16 fw_470 = 47000;
-    u32 offset_fw;
+    u16 fw_476 = 47600;
+    int offset_fw;
     s32 ret;
-    u64 readed = 0;
+    u64 bytesread = 0;
     u64 written = 0;
     u64 pos = 0;
     u16 ver = 0;
@@ -1287,7 +1360,7 @@ int patch_exe_error_09(char *path_exe)
 
     sysLv2FsChmod(path_exe, FS_S_IFMT | 0777);
 
-    if(firmware >= 0x470C) return SUCCESS;
+    if(firmware >= 0x476C) return SUCCESS;
 
     // open self/sprx and changes the fw version
     ret = sysLv2FsOpen( path_exe, SYS_O_RDWR, &file, 0, NULL, 0 );
@@ -1298,10 +1371,12 @@ int patch_exe_error_09(char *path_exe)
         if(ret == SUCCESS && pos == 0xCULL)
         {
             // read offset in file
-            ret = sysLv2FsRead( file, &offset_fw, 0x4, &readed );
+            ret = sysLv2FsRead( file, &offset_fw, 0x4, &bytesread );
 
-            if(ret == SUCCESS && readed == 4ULL && offset_fw > 0xF)
+            if(ret == SUCCESS && bytesread == 4ULL && offset_fw > 0xF)
             {
+                retry_offset_exe:
+
                 offset_fw -= 0x78; if(offset_fw < 0x90 || offset_fw > 0x800) offset_fw = strstr(path_exe, ".sprx") ? 0x258 : 0x428;
                 offset_fw += 6;
 
@@ -1309,15 +1384,17 @@ int patch_exe_error_09(char *path_exe)
 
                 if(ret == SUCCESS && pos == (u64) offset_fw)
                 {
-                    ret = sysLv2FsRead( file, &ver, 0x2, &readed ); //self/sprx min fw version
-                    if(ret == SUCCESS && readed == 0x2ULL && (ver >= 34000 && ver <= fw_470))
+                    ret = sysLv2FsRead( file, &ver, 0x2, &bytesread ); //self/sprx min fw version
+                    if(ver % 100) {offset_fw = (offset_fw==0x258) ? 0x278 : 0; goto retry_offset_exe;}
+
+                    if(ret == SUCCESS && bytesread == 0x2ULL && (ver >= 34000 && ver <= fw_476))
                     {
                         ret = sysLv2FsLSeek64( file, (u64) offset_fw, 0, &pos );
                         u16 cur_firm = ((firmware>>12) & 0xF) * 10000 + ((firmware>>8) & 0xF) * 1000 + ((firmware>>4) & 0xF) * 100;
 
                         if(ret == SUCCESS && ver > cur_firm)
                         {
-                            if(ver > fw_421 && (firmware >= 0x421C && firmware < 0x470C))
+                            if(ver > fw_421 && (firmware >= 0x421C && firmware < 0x476C))
                             {
                                 sysLv2FsWrite( file, &cur_firm, 0x2, &written );
                                 flag = 1; //patch applied
@@ -1348,7 +1425,7 @@ void patch_error_09( const char *path, int quick_ver_check )
     if(quick_ver_check)
     {
         char ps3_sys_ver[8] = "00.0000";
-        char sfo[0x420];
+        char sfo[MAX_PATH_LEN];
         sprintf(sfo, "%s/PS3_GAME/PARAM.SFO", path);
         get_field_param_sfo(sfo, "PS3_SYSTEM_VER", ps3_sys_ver, 7);
 
@@ -1368,7 +1445,7 @@ void patch_error_09( const char *path, int quick_ver_check )
     if( d == -1 ) return;
 
     int ext;
-    char f[0x420];
+    char f[MAX_PATH_LEN];
 
     while(true)
     {
@@ -1874,7 +1951,7 @@ int delete_entries(t_directories *list, int *max, u32 flag)
     flag &= GAMELIST_FILTER; // filter entries
     while(n < (*max) && (*max) > 0)
     {
-        if((list[n].flags & flag) || (list[n].flags == flag))
+        if((list[n].flags & flag) || (list[n].flags == flag) || list[n].path_name[0] == 0)
         {
             deleted++;
 
@@ -1950,7 +2027,7 @@ void fill_psx_iso_entries_from_device(char *path, u32 flag, t_directories *list,
         if(!(flag & HDD0_FLAG))
         {
             // is not HDD
-            char file2[0x420];
+            char file2[MAX_PATH_LEN];
 
             sprintf(file2, "%s/VM1/%s/Internal_MC.VM1", self_path, list[*max].title);
             if(file_exists(file2))
@@ -1959,7 +2036,7 @@ void fill_psx_iso_entries_from_device(char *path, u32 flag, t_directories *list,
 
                 if(size > 0 && file_exists(list[*max].path_name))
                 {
-                    char file3[0x420];
+                    char file3[MAX_PATH_LEN];
                     sprintf(file3, "%s/Internal_MC.VM1", list[*max].path_name);
                     unlink_secure(file3);
 
@@ -2003,7 +2080,7 @@ int fill_iso_entries_from_device(char *path, u32 flag, t_directories *list, int 
     bool is_ps2_classic = is_psp && !is_retro &&
                           (strlen(ps2classic_path) > 0 && strstr(path, ps2classic_path) != NULL);
 
-    char wm_path[0x420];
+    char wm_path[MAX_PATH_LEN];
     bool use_wmtmp =  file_exists("/dev_hdd0/tmp/wmtmp");
     bool use_wmtmp_ps3 = ( use_wmtmp && is_ps3_iso );
 
@@ -2070,7 +2147,7 @@ int fill_iso_entries_from_device(char *path, u32 flag, t_directories *list, int 
 
         sprintf(list[*max].path_name, "%s/%s", path, dir.d_name);
 
-        char name[0x420];
+        char name[MAX_PATH_LEN];
 
         if(is_ps3_iso) list[*max].flags = flag | PS3_FLAG;
         else if(is_psx_iso || ((flag & (ISO_FLAGS)) == (PS1_FLAG))) list[*max].flags = flag | (PS1_FLAG);
@@ -2149,7 +2226,7 @@ int fill_iso_entries_from_device(char *path, u32 flag, t_directories *list, int 
             sprintf(wm_path, "/dev_hdd0/tmp/wmtmp/%s.jpg", name);
             if(file_exists(wm_path)==false)
             {
-                char image_file[0x420];
+                char image_file[MAX_PATH_LEN];
                 sprintf(image_file, "%s/%s.jpg", path, name);
                 CopyFile(image_file, wm_path);
                 if(file_exists(wm_path)==false)
@@ -2181,7 +2258,7 @@ int fill_iso_entries_from_device(char *path, u32 flag, t_directories *list, int 
             sprintf(ntfs_path, "/dev_hdd0/tmp/wmtmp/%s.ntfs[%s]", name, extension);
             if(file_exists(ntfs_path)==false)
             {
-                snprintf(ntfs_path, 0x420, "%s/%s", path, dir.d_name);
+                snprintf(ntfs_path, MAX_PATH_LEN, "%s/%s", path, dir.d_name);
 
                 if(file_exists(ntfs_path)==false) goto cont;
 
@@ -2390,7 +2467,7 @@ void fill_directory_entries_with_alt_path(char *file, int n, char *retro_path, c
 int fill_entries_from_device(char *path, t_directories *list, int *max, u32 flag, int sel, bool append)
 {
     DIR  *dir;
-    char file[0x420];
+    char file[MAX_PATH_LEN];
 
     int n;
     int in_progress = 0;
@@ -2407,19 +2484,27 @@ int fill_entries_from_device(char *path, t_directories *list, int *max, u32 flag
     if(sel == GAMEBASE_MODE && (use_cobra || use_mamba) && /*noBDVD == MODE_DISCLESS &&*/ append == false)
     {
         // isos
-        strncpy(file, path, 0x420);
+        strncpy(file, path, MAX_PATH_LEN);
         n = 1; while(file[n] != '/' && file[n] != 0) n++;
 
         file[n] = 0; strcat(file, "/PS3ISO\0");
 
         if(game_list_category == GAME_LIST_PS3_ONLY || game_list_category == GAME_LIST_ALL)
+        {
             fill_iso_entries_from_device(file, flag, list, max, 0);
+
+            file[n] = 0; strcat(file, "/PS3ISO [auto]\0");
+            fill_iso_entries_from_device(file, flag, list, max, 0);
+        }
 
         if(game_list_category == GAME_LIST_RETRO || game_list_category == GAME_LIST_ALL)
         {
             if(retro_mode == RETRO_ALL || retro_mode == RETRO_PSX || retro_mode == RETRO_PSALL)
             {
                 file[n] = 0; strcat(file, "/PSXISO\0");
+                fill_iso_entries_from_device(file, flag | PS1_FLAG, list, max, 0);
+
+                file[n] = 0; strcat(file, "/PSXISO [auto]\0");
                 fill_iso_entries_from_device(file, flag | PS1_FLAG, list, max, 0);
             }
 
@@ -2436,6 +2521,9 @@ int fill_entries_from_device(char *path, t_directories *list, int *max, u32 flag
                     if(!strncmp(file, "/dev_hdd0", 9))
                     {
                         file[n] = 0; strcat(file, "/PS2ISO\0");
+                        fill_iso_entries_from_device(file, flag | PS2_FLAG, list, max, 0);
+
+                        file[n] = 0; strcat(file, "/PS2ISO [auto]\0");
                         fill_iso_entries_from_device(file, flag | PS2_FLAG, list, max, 0);
                     }
                 }
@@ -2545,6 +2633,36 @@ int fill_entries_from_device(char *path, t_directories *list, int *max, u32 flag
                     fill_directory_entries_with_alt_path(file, n, retro_wswan_path, "/ROMS/wsw", list, max, flag);
                 }
 
+                sprintf(cfg_path, "%s/USRDIR/cores/a7800-retroarch.cfg", self_path);
+                if((retro_mode == RETRO_ALL || retro_mode == RETRO_A7800) && (roms_count < max_roms) && file_exists(cfg_path))
+                {
+                    fill_directory_entries_with_alt_path(file, n, retro_a7800_path, "/ROMS/a7800", list, max, flag);
+                }
+
+                sprintf(cfg_path, "%s/USRDIR/cores/lynx-retroarch.cfg", self_path);
+                if((retro_mode == RETRO_ALL || retro_mode == RETRO_LYNX) && (roms_count < max_roms) && file_exists(cfg_path))
+                {
+                    fill_directory_entries_with_alt_path(file, n, retro_lynx_path, "/ROMS/lynx", list, max, flag);
+                }
+
+                sprintf(cfg_path, "%s/USRDIR/cores/gw-retroarch.cfg", self_path);
+                if((retro_mode == RETRO_ALL || retro_mode == RETRO_GW) && (roms_count < max_roms) && file_exists(cfg_path))
+                {
+                    fill_directory_entries_with_alt_path(file, n, retro_gw_path, "/ROMS/gw", list, max, flag);
+                }
+
+                sprintf(cfg_path, "%s/USRDIR/cores/vectrex-retroarch.cfg", self_path);
+                if((retro_mode == RETRO_ALL || retro_mode == RETRO_VECTX) && (roms_count < max_roms) && file_exists(cfg_path))
+                {
+                    fill_directory_entries_with_alt_path(file, n, retro_vectrex_path, "/ROMS/vectrex", list, max, flag);
+                }
+
+                sprintf(cfg_path, "%s/USRDIR/cores/2048-retroarch.cfg", self_path);
+                if((retro_mode == RETRO_ALL || retro_mode == RETRO_2048) && (roms_count < max_roms) && file_exists(cfg_path))
+                {
+                    fill_directory_entries_with_alt_path(file, n, retro_2048_path, "/ROMS/2048", list, max, flag);
+                }
+
                 if(roms_count) roms_count = max_roms;
             }
         }
@@ -2553,13 +2671,19 @@ int fill_entries_from_device(char *path, t_directories *list, int *max, u32 flag
     if(sel >= HOMEBREW_MODE && (use_cobra || use_mamba) && /*noBDVD == MODE_DISCLESS &&*/ append == false)
     {
         // isos BR-DVD
-        strncpy(file, path, 0x420);
+        strncpy(file, path, MAX_PATH_LEN);
         n = 1; while(file[n] != '/' && file[n]!=0) n++;
 
         file[n] = 0; strcat(file, "/BDISO\0");
         fill_iso_entries_from_device(file, D_FLAG_HOMEB | D_FLAG_HOMEB_BD | (flag  & GAMELIST_FILTER), list, max, 0);
 
+        file[n] = 0; strcat(file, "/BDISO [auto]\0");
+        fill_iso_entries_from_device(file, D_FLAG_HOMEB | D_FLAG_HOMEB_BD | (flag  & GAMELIST_FILTER), list, max, 0);
+
         file[n] = 0; strcat(file, "/DVDISO\0");
+        fill_iso_entries_from_device(file, D_FLAG_HOMEB | D_FLAG_HOMEB_DVD | (flag  & GAMELIST_FILTER), list, max, 0);
+
+        file[n] = 0; strcat(file, "/DVDISO [auto]\0");
         fill_iso_entries_from_device(file, D_FLAG_HOMEB | D_FLAG_HOMEB_DVD | (flag  & GAMELIST_FILTER), list, max, 0);
 
         file[n] = 0; strcat(file, "/VIDEO\0");
@@ -2579,7 +2703,7 @@ int fill_entries_from_device(char *path, t_directories *list, int *max, u32 flag
                                                       (retro_mode == RETRO_ALL || retro_mode == RETRO_PSX || retro_mode == RETRO_PSALL))))
     {
         int n;
-        strncpy(file, path, 0x420);
+        strncpy(file, path, MAX_PATH_LEN);
         n = 1; while(file[n] != '/' && file[n] != 0)  n++;
 
         file[n] = 0; strcat(file, "/PSXGAMES\0");
@@ -2620,11 +2744,13 @@ int fill_entries_from_device(char *path, t_directories *list, int *max, u32 flag
     char pattern[128];
 
     if(sel == GAMEBASE_MODE)
-        strcpy(pattern, "%s/PS3_GAME/PARAM.SFO");
+        strcpy(pattern, "%s/PS3_GAME/PARAM.SFO\0");
     else if(sel == HOMEBREW_MODE)
-        strcpy(pattern, "%s/PARAM.SFO");
+        strcpy(pattern, "%s/PARAM.SFO\0");
     else
         pattern[0] = 0;
+
+    struct stat s;
 
     while(true)
     {
@@ -2675,20 +2801,25 @@ int fill_entries_from_device(char *path, t_directories *list, int *max, u32 flag
 
             list[*max].title[63] = 0;
 
-            sprintf(file, "%s/%s",  list[*max].path_name, "PS3_DISC.SFB");
+            sprintf(file, "%s/%s", list[*max].path_name, "PS3_DISC.SFB");
             if( (sel == HOMEBREW_MODE) ||
                ((sel == GAMEBASE_MODE) && (parse_ps3_disc((char *) file, list[*max].title_id)<0))) {
                     sprintf(file, pattern, list[*max].path_name);
                     parse_param_sfo_id(file, list[*max].title_id); // build de ID from param.sfo
             }
             list[*max].title_id[63] = 0;
+
+            if(sel == GAMEBASE_MODE)
+                sprintf(file, "%s/PS3_GAME/USRDIR/EBOOT.BIN", list[*max].path_name);
+            else if(sel == HOMEBREW_MODE)
+                sprintf(pattern, "%s/USRDIR/EBOOT.BIN", list[*max].path_name);
         }
         else
         {
-            struct stat s;
             sprintf(file, "%s/EBOOT.BIN", list[*max].path_name);
-            if(stat(file, &s) < 0)  continue;
         }
+
+        if(stat(file, &s) < 0)  continue;
 
         if(((*max) & 4) == 4)
         {
@@ -2929,8 +3060,8 @@ typedef struct _t_fast_files
     int bigfile_mode;
     int pos_path; // filename position used in bigfiles
 
-    char pathr[0x420]; // read path
-    char pathw[0x420]; // write path
+    char pathr[MAX_PATH_LEN]; // read path
+    char pathw[MAX_PATH_LEN]; // write path
 
 
     int use_doublebuffer; // if files >= 4MB use_doblebuffer =1;
@@ -3008,7 +3139,7 @@ static int fast_copy_process();
 
 static int nfilecached = 0;
 static s64 filecached_bytes[MAX_FILECACHED];
-static char filecached[MAX_FILECACHED][2][0x420];
+static char filecached[MAX_FILECACHED][2][MAX_PATH_LEN];
 
 static char * path_cache = NULL;
 
@@ -3204,7 +3335,7 @@ static int fast_copy_add(char *pathr, char *pathw, char *file)
     else size_mem = ((int) s.st_size);
 
 
-    fast_files[fast_num_files].mem = memalign(32, size_mem+size_mem * (fast_files[fast_num_files].use_doublebuffer != 0) + 0x420);
+    fast_files[fast_num_files].mem = memalign(32, size_mem+size_mem * (fast_files[fast_num_files].use_doublebuffer != 0) + MAX_PATH_LEN);
     fast_files[fast_num_files].size_mem = size_mem;
 
     if(!fast_files[fast_num_files].mem)
@@ -3225,9 +3356,12 @@ void fast_func_read(sysFSAio *xaio, s32 error, s32 xid, u64 size)
 {
     t_fast_files* fi = (t_fast_files *) xaio->usrdata;
 
-    if(error != 0 || size != xaio->size) {
+    if(error != 0 || size != xaio->size)
+    {
         fi->readed = -1; return;
-    } else fi->readed += (s64) size;
+    }
+    else
+        fi->readed += (s64) size;
 
     fast_read = 2;fi->fl = 3;
 
@@ -3636,18 +3770,15 @@ int fast_copy_process()
 
                 if(write_size < 1024LL)
                 {
-                    DPrintf("%s %lli B ", language[GLUTIL_WROTE], write_size);
-                    DPrintf("%s\n\n", fast_files[current_fast_file_w].pathw);
+                    DPrintf("%s (%lli B)\n", fast_files[current_fast_file_w].pathw, write_size);
                 }
                 else if(write_size < 0x100000LL)
                 {
-                    DPrintf("%s %lli KB ", language[GLUTIL_WROTE], write_size  / 1024LL);
-                    DPrintf("%s\n\n", fast_files[current_fast_file_w].pathw);
+                    DPrintf("%s (%lli KB)\n", fast_files[current_fast_file_w].pathw, write_size  / 1024LL);
                 }
                 else
                 {
-                    DPrintf("%s %lli MB ", language[GLUTIL_WROTE], write_size / 0x100000LL);
-                    DPrintf("%s\n\n", fast_files[current_fast_file_w].pathw);
+                    DPrintf("%s (%lli MB)\n", fast_files[current_fast_file_w].pathw, write_size / 0x100000LL);
                 }
 
 
@@ -3898,7 +4029,7 @@ static int my_game_test(char *path)
     else
         DPrintf("%s\n", path);
 
-    char f[0x420];
+    char f[MAX_PATH_LEN];
     struct stat s;
 
     dir = opendir(path);
@@ -3929,12 +4060,12 @@ static int my_game_test(char *path)
 
             sprintf(f, "%s/%s", path, entry->d_name);
 
-            if(stat(f, &s) != SUCCESS) {abort_copy = 3; DPrintf("File error!!!\n -> %s\n\n", f); break;}
+            if(stat(f, &s) != SUCCESS) {DPrintf("File error!!!\n -> %s\n\n", f); continue;}
             size = s.st_size;
 
             int ext = entry->d_namlen - 4;
             if(ext > 1 && ( strcasestr("sprx|self", entry->d_name + ext) != NULL ||
-                           (strcmp(entry->d_name, "EBOOT.BIN" ) == SUCCESS)))
+                          ( strcmp(entry->d_name, "EBOOT.BIN" ) == SUCCESS )))
             {
                 int r = patch_exe_error_09(f);
 
@@ -4088,7 +4219,7 @@ static int my_game_countsize(char *path)
 
     DPrintf("count in %s\n", path);
 
-    char f[0x420];
+    char f[MAX_PATH_LEN];
     struct stat s;
 
     while(true)
@@ -4102,7 +4233,8 @@ static int my_game_countsize(char *path)
         if((entry->d_type & DT_DIR))
         {
             sprintf(f, "%s/%s", path, entry->d_name);
-            my_game_countsize(f);
+
+            if(strcmp(entry->d_name, "PS3_UPDATE") != 0) my_game_countsize(f);
 
             if(abort_copy) break;
         }
@@ -4112,7 +4244,7 @@ static int my_game_countsize(char *path)
 
             sprintf(f, "%s/%s", path, entry->d_name);
 
-            if(stat(f, &s) != SUCCESS) {abort_copy = 3; DPrintf("File error!!!\n -> %s\n\n", f); break;}
+            if(stat(f, &s) != SUCCESS) {DPrintf("File error!!!\n -> %s\n\n", f); continue;}
             size = s.st_size;
 
             file_counter++;
@@ -4163,7 +4295,7 @@ static int my_game_countsize(char *path)
 static int my_game_delete(char *path)
 {
     DIR  *dir;
-    char f[0x420];
+    char f[MAX_PATH_LEN];
     int seconds;
 
     dir = opendir(path);
@@ -4242,46 +4374,39 @@ static int _my_game_copy(char *path, char *path2)
 
     if (sysFsOpendir(path, &dir)) {DPrintf("Error in sysFsOpendir()\n"); abort_copy = 7; return FAILED;}
 
+    if(!copy_split_to_cache) DPrintf("\n%s: %s\n%s: %s\n\n", language[FASTCPADD_COPYING], path, language[GLUTIL_WTO], path2);
+
     while(true)
     {
         sysFSDirent entry;
         u64 read;
         read = sizeof(sysFSDirent);
 
-        if(sysFsReaddir(dir, &entry, &read) || !read) break;
+        if(sysFsReaddir(dir, &entry, &read) || !read || abort_copy) break;
 
         if(entry.d_name[0] == '.' && entry.d_name[1] == 0) continue;
         if(entry.d_name[0] == '.' && entry.d_name[1] == '.' && entry.d_name[2] == 0) continue;
 
-       // if(copy_split_to_cache && (entry.d_type & DT_DIR)) continue;
-
         if((entry.d_type & DT_DIR))
         {
-            if(abort_copy) break;
-
-            char *d1 = (char *) malloc(0x420);
-            char *d2 = (char *) malloc(0x420);
+            char *d1 = (char *) malloc(MAX_PATH_LEN);
+            char *d2 = (char *) malloc(MAX_PATH_LEN);
 
             if(!d1 || !d2) {if(d1) free(d1); if(d2) free(d2); sysFsClosedir(dir); DPrintf("malloc() Error!!!\n\n"); abort_copy = 2; return FAILED;}
 
             sprintf(d1,"%s/%s", path, entry.d_name);
             sprintf(d2,"%s/%s", path2, entry.d_name);
-            if(!copy_split_to_cache) DPrintf("D1: %s\nD2: %s\n", path, path2);
 
-            //if(strcmp(path2, "/dev_bdvd/PS3_UPDATE") == 0)
-            //{
             if(!copy_split_to_cache) mkdir_secure(d2);
-            _my_game_copy(d1, d2);
-            //}
+
+            if(strcmp(entry.d_name, "PS3_UPDATE") != 0) _my_game_copy(d1, d2);
 
             free(d1); free(d2);
-
-            if(abort_copy) break;
         }
         else if(strcmp(entry.d_name, "PS3UPDAT.PUP") == 0) ;
         else
         {
-           if(!copy_split_to_cache) DPrintf("EPATH: %s\nEPATH2: %s\nENTRY %s\n", path, path2, entry.d_name);
+           //if(!copy_split_to_cache) DPrintf("> %s\n", entry.d_name);
 
            if(fast_copy_add(path, path2, entry.d_name) < 0)
            {
@@ -4350,7 +4475,7 @@ static int my_game_copy(char *path, char *path2)
 }
 
 
-static char filename[0x420];
+static char filename[MAX_PATH_LEN];
 
 void copy_from_selection(int game_sel)
 {
@@ -4362,6 +4487,8 @@ void copy_from_selection(int game_sel)
     DCls();
     my_game_countsize(directories[game_sel].path_name);
     total_fast_files = file_counter;
+
+    sleep(2); DCls();
 
     if(!(directories[game_sel].flags & D_FLAG_BDVD))
     {
@@ -4376,9 +4503,9 @@ void copy_from_selection(int game_sel)
 
             if((copy_total_size + 0x40000000LL) >= (s64) free_hdd0)
             {
-                sprintf(filename, "%s\n\n%s%1.2f GB", "Error: no space in HDD0 to copy it", "You need ",
-                    ((double) (copy_total_size + 0x40000000LL - free_hdd0)) / GIGABYTES);
+                sprintf(filename, language[GAMECHCPY_NOSPACE], free_hdd0, ((double) (copy_total_size + 0x40000000LL - free_hdd0)) / GIGABYTES);
                 DrawDialogOK(filename);
+
                 return;
             }
         }
@@ -4391,11 +4518,6 @@ void copy_from_selection(int game_sel)
             forcedevices = D_FLAG_USB;
             return;
         }
-        else
-        {
-            //old mode
-            copy_total_size = 0;
-        }
     }
 
     if(directories[game_sel].flags & D_FLAG_BDVD)  {copy_from_bluray(); return;}
@@ -4405,7 +4527,7 @@ void copy_from_selection(int game_sel)
 #endif
     int n;
     int curr_device = 0;
-    char name[0x420];
+    char name[MAX_PATH_LEN];
     int dest = 0;
 
     dialog_action = 0;
@@ -4417,9 +4539,9 @@ void copy_from_selection(int game_sel)
 
     if(directories[game_sel].flags & (PS1_FLAG)) {path_install = "PSXGAMES"; hdd_folder2 = "dev_hdd0";}
 
-    if(directories[game_sel].flags & D_FLAG_HDD0) {// is hdd0
-
-
+    if(directories[game_sel].flags & D_FLAG_HDD0)
+    {
+        // is hdd0
         for(n = 1; n < 11; n++)
         {
             dialog_action = 0;
@@ -4463,7 +4585,7 @@ void copy_from_selection(int game_sel)
 
             if((copy_total_size + 0x100000LL) >= (s64) free_usb)
             {
-                sprintf(filename, "%s\n\n%s%1.2f GB\n\n%s", "Warning: no space in USB to copy it", "You need ",
+                sprintf(filename, "%s\n\n%s%1.2f GB\n\n%s", "Warning: There is not enough space in USB to copy it", "You need ",
                     ((double) (copy_total_size + 0x100000LL - free_usb)) / GIGABYTES,  "Do you want to abort?");
 
                 dialog_action = 0;
@@ -4774,7 +4896,7 @@ void copy_from_selection(int game_sel)
 
 void copy_from_bluray()
 {
-    char name[0x420];
+    char name[MAX_PATH_LEN];
 
     int curr_device = 0;
     sysFSStat status;
@@ -4834,8 +4956,7 @@ void copy_from_bluray()
 
             if((copy_total_size + 0x40000000LL) >= (s64) free_hdd0)
             {
-                sprintf(filename, "%s\n\n%s%1.2f GB", "Error: no space in HDD0 to copy it", "You need ",
-                    ((double) (copy_total_size + 0x40000000LL - free_hdd0)) / GIGABYTES);
+                sprintf(filename, language[GAMECHCPY_NOSPACE], free_hdd0, ((double) (copy_total_size + 0x40000000LL - free_hdd0)) / GIGABYTES);
                 DrawDialogOK(filename);
                 return;
             }
@@ -4852,7 +4973,7 @@ void copy_from_bluray()
 
             if((copy_total_size + 0x100000LL) >= (s64) free_usb)
             {
-                sprintf(filename, "%s\n\n%s%1.2f GB\n\n%s", "Warning: no space in USB to copy it", "You need ",
+                sprintf(filename, "%s\n\n%s%1.2f GB\n\n%s", "Warning: There is not enough space in USB to copy it", "You need ",
                     ((double) (copy_total_size + 0x100000LL - free_usb)) / GIGABYTES, "Do you want to abort?");
 
                 dialog_action = 0;
@@ -5042,8 +5163,8 @@ void copy_to_cache(int game_sel, char * hmanager_path)
 
     int n;
 
-    char name[0x420];
-    char name2[0x420];
+    char name[MAX_PATH_LEN];
+    char name2[MAX_PATH_LEN];
     int dest = 0;
 
     dialog_action = 0;
@@ -5076,8 +5197,7 @@ void copy_to_cache(int game_sel, char * hmanager_path)
         filecached[nfilecached][0][0] = 0;
         filecached[nfilecached][1][0] = 0;
 
-        // reset to update datas
-
+        // reset to update data
 
         time_start = time(NULL);
 
@@ -5375,7 +5495,7 @@ void test_game(int game_sel)
         r = self_alarm_version;
     }
 
-    char game_update_path[0x420];
+    char game_update_path[MAX_PATH_LEN];
 
     sprintf(game_update_path, "/dev_hdd0/game/%c%c%c%c%s", directories[game_sel].title_id[0], directories[game_sel].title_id[1],
             directories[game_sel].title_id[2], directories[game_sel].title_id[3], &directories[game_sel].title_id[5]);
@@ -6036,8 +6156,8 @@ int param_sfo_util(char * path, int patch_app)
     Lv2FsFile fd;
     u64 bytes;
     u64 position = 0LL;
-    char file[0x420];
-    char file2[0x420];
+    char file[MAX_PATH_LEN];
+    char file2[MAX_PATH_LEN];
 
     u8 * app_ver = NULL;
 
@@ -6186,8 +6306,8 @@ int param_sfo_patch_category_to_cb(char * path_src, char *path_dst)
     Lv2FsFile fd;
     u64 bytes;
     u64 position = 0LL;
-    char file[0x420];
-    char file2[0x420];
+    char file[MAX_PATH_LEN];
+    char file2[MAX_PATH_LEN];
 
     unsigned char *mem2 = NULL;
 
@@ -6300,8 +6420,8 @@ void add_sys8_bdvd(char * bdvd, char * app_home)
 {
     static char compare1[]="/dev_bdvd";
     static char compare2[]="/app_home";
-    static char replace1[0x420];
-    static char replace2[0x420];
+    static char replace1[MAX_PATH_LEN];
+    static char replace2[MAX_PATH_LEN];
     int pos = 17;
 
     table_compare[pos] = NULL;
@@ -6309,7 +6429,7 @@ void add_sys8_bdvd(char * bdvd, char * app_home)
 
     if(bdvd)
     {
-        strncpy(replace1, bdvd, 0x420);
+        strncpy(replace1, bdvd, MAX_PATH_LEN);
         table_compare[pos] = compare1;
         table_replace[pos] = replace1;
         pos++;
@@ -6317,7 +6437,7 @@ void add_sys8_bdvd(char * bdvd, char * app_home)
 
     if(app_home)
     {
-        strncpy(replace2, app_home, 0x420);
+        strncpy(replace2, app_home, MAX_PATH_LEN);
         table_compare[pos] = compare2;
         table_replace[pos] = replace2;
         pos++;
@@ -6366,8 +6486,8 @@ void build_sys8_path_table()
     {
         int l = strlen(table_compare[entries]);
 
-        arena_size += 0x420;
-        for(m = 0x80; m <= 0x420; m += 0x20)
+        arena_size += MAX_PATH_LEN;
+        for(m = 0x80; m <= MAX_PATH_LEN; m += 0x20)
             if(l < m) {arena_size += m; break;}
 
         entries++;
@@ -6391,7 +6511,7 @@ void build_sys8_path_table()
         int l = strlen(table_compare[n]);
 
         int size = 0;
-        for(m = 0x80; m <= 0x420; m += 0x20)
+        for(m = 0x80; m <= MAX_PATH_LEN; m += 0x20)
             if(l < m) {size += m; break;}
 
         pentries->compare_addr = dest_table_addr + (u64) (arena_offset);
@@ -6399,12 +6519,12 @@ void build_sys8_path_table()
         pentries->replace_addr = dest_table_addr + (u64) (arena_offset + size);
 
         strncpy(&datas[arena_offset], table_compare[n], size);
-        strncpy(&datas[arena_offset + size], table_replace[n], 0x420);
+        strncpy(&datas[arena_offset + size], table_replace[n], MAX_PATH_LEN);
 
         pentries->compare_len = strlen(&datas[arena_offset]);
         pentries->replace_len = strlen(&datas[arena_offset + size]);
 
-        arena_offset += size + 0x420;
+        arena_offset += size + MAX_PATH_LEN;
         pentries ++;
     }
 
@@ -6423,7 +6543,7 @@ void build_sys8_path_table()
 void copy_usb_to_iris(char * path)
 {
     int n;
-    char name[0x420];
+    char name[MAX_PATH_LEN];
 
     copy_split_to_cache = 0;
     copy_total_size = 0LL;
@@ -6451,8 +6571,7 @@ void copy_usb_to_iris(char * path)
 
     if((copy_total_size + 0x40000000LL) >= (s64) free_hdd0)
     {
-        sprintf(filename, "%s\n\n%s%1.2f GB", "Error: no space in HDD0 to copy it", "You need ",
-            ((double) (copy_total_size + 0x40000000LL - free_hdd0)) / GIGABYTES);
+        sprintf(filename, language[GAMECHCPY_NOSPACE], free_hdd0, ((double) (copy_total_size + 0x40000000LL - free_hdd0)) / GIGABYTES);
         DrawDialogOK(filename);
         return;
     }

@@ -145,7 +145,7 @@ int is_payload_loaded_465dex(void)
     if((addr>>32) == 0x534B3145) { // new method to detect the payload
         addr&= 0xffffffff;
         if(addr) {
-            restore_syscall8[0]= SYSCALL_BASE + 64ULL; // (8*8)
+            restore_syscall8[0]= SYSCALL_BASE + (u64) (SYSCALL_SK1E * 8ULL); // (8*8)
             restore_syscall8[1]= peekq(restore_syscall8[0]);
             pokeq(restore_syscall8[0], 0x8000000000000000ULL + (u64) (addr + 0x20));
         }
@@ -153,7 +153,7 @@ int is_payload_loaded_465dex(void)
         return SKY10_PAYLOAD;
     }
 
-    addr = peekq((SYSCALL_BASE + 36 * 8));
+    addr = peekq((SYSCALL_BASE + SYSCALL_36 * 8));
     addr = peekq(addr);
     if(peekq(addr - 0x20) == 0x534B313000000000ULL) //SK10 HEADER
         return SKY10_PAYLOAD;
@@ -224,7 +224,7 @@ static inline void remove_lv2_memcpy()
     for(n = 0; n < 50; n++) {
     /* restore syscall */
     //remove_new_poke();
-// Found @ 0x1AD3F4 This is per FW
+
         pokeq(NEW_POKE_SYSCALL_ADDR + 0x00, 0xF821FF017C0802A6ULL);
         pokeq(NEW_POKE_SYSCALL_ADDR + 0x08, 0xFBC100F0FBE100F8ULL);
         pokeq(NEW_POKE_SYSCALL_ADDR + 0x10, 0xEBC2FF407C7F1B78ULL);
@@ -261,19 +261,19 @@ void load_payload_465dex (int mode)
                       (u64) umount_465dex_bin,
                       umount_465dex_bin_size);
 
-    restore_syscall8[0]= SYSCALL_BASE + 64ULL; // (8*8)
+    restore_syscall8[0]= SYSCALL_BASE + (u64) (SYSCALL_SK1E * 8ULL); // (8*8)
     restore_syscall8[1]= peekq(restore_syscall8[0]);
 
     u64 id[2];
     // copy the id
     id[0]= 0x534B314500000000ULL | (u64) PAYLOAD_OFFSET;
-    id[1] = SYSCALL_BASE + 64ULL; // (8*8)
+    id[1] = SYSCALL_BASE + (u64) (SYSCALL_SK1E * 8ULL); // (8*8)
     lv2_memcpy(0x80000000000004f0ULL, (u64) &id[0], 16);
 
     u64 inst8 =  peekq(0x8000000000003000ULL);                     // get TOC
     lv2_memcpy(0x8000000000000000ULL + (u64) (PAYLOAD_OFFSET + 0x28), (u64) &inst8, 8);
     inst8 = 0x8000000000000000ULL + (u64) (PAYLOAD_OFFSET + 0x20); // syscall_8_desc - sys8
-    lv2_memcpy(SYSCALL_BASE + (u64) (8 * 8), (u64) &inst8, 8);
+    lv2_memcpy(SYSCALL_BASE + (u64) (SYSCALL_SK1E * 8ULL), (u64) &inst8, 8);
 
     usleep(1000);
 
@@ -283,6 +283,9 @@ void load_payload_465dex (int mode)
     pokeq(0x80000000007EF220ULL, 0ULL);
 
     //Patches from webMAN
+    if(bEnableLv2_webman_patch)
+    {
+		//patches by deank
 		pokeq(0x80000000002764F8ULL, 0x4E80002038600000ULL ); // fix 8001003C error  Original: 0x4E80002038600000ULL
 		pokeq(0x8000000000276500ULL, 0x7C6307B44E800020ULL ); // fix 8001003C error  Original: 0x7C6307B44E800020ULL
 		pokeq(0x8000000000059F5CULL, 0x63FF003D60000000ULL ); // fix 8001003D error  Original: 0x63FF003D419EFFD4ULL
@@ -298,6 +301,66 @@ void load_payload_465dex (int mode)
 
 		pokeq(0x800000000005962CULL, 0xF821FE917C0802A6ULL ); // just restore the original
 		pokeq(0x800000000005C780ULL, 0x419E0038E8610098ULL ); // just restore the original
+
+/*
+        if(file_exists("/dev_flash/rebug")==false || bEnableLv2_webman_patch==3)
+        {
+            //anti-ode patches by deank
+            //pokeq(0x800000000005962CULL, 0xF821FE917C0802A6ULL ); //replaced by deank's patch (2015-01-03)
+            pokeq(0x8000000000059654ULL, 0x6000000060000000ULL );
+            pokeq(0x800000000005965CULL, 0x600000003BA00000ULL );
+        }
+
+        pokeq(0x800000000005C780ULL, 0x60000000E8610098ULL );
+*/
+        if(bEnableLv2_webman_patch>=2 || bEnableLv2_habib_patch == 2) bEnableLv2_habib_patch=0;
+    }
+
+    if((bEnableLv2_habib_patch == 11) || (bEnableLv2_habib_patch == 2))
+    { // enable new patches
+        pokeq(0x800000000005C780ULL + 0x00, 0x60000000E8610098ULL);
+        pokeq(0x800000000005C780ULL + 0x08, 0x2FA30000419E000CULL);
+        pokeq(0x800000000005C780ULL + 0x10, 0x388000334800BE15ULL);
+        pokeq(0x800000000005C780ULL + 0x18, 0xE80100F07FE307B4ULL);
+
+        pokeq(0x800000000005962CULL + 0x00, 0x386000004E800020ULL);
+        pokeq(0x800000000005962CULL + 0x08, 0xFBC10160FBE10168ULL);
+        pokeq(0x800000000005962CULL + 0x10, 0xFB610148FB810150ULL);
+        pokeq(0x800000000005962CULL + 0x18, 0xFBA10158F8010180ULL);
+    }
+    else if(bEnableLv2_habib_patch == 10)
+    { // disable new patches
+        pokeq(0x800000000005C780ULL + 0x00, 0x419E0038E8610098ULL);
+        pokeq(0x800000000005C780ULL + 0x08, 0x2FA30000419E000CULL);
+        pokeq(0x800000000005C780ULL + 0x10, 0x388000334800BE15ULL);
+        pokeq(0x800000000005C780ULL + 0x18, 0xE80100F07FE307B4ULL);
+
+        pokeq(0x800000000005962CULL + 0x00, 0xF821FE917C0802A6ULL);
+        pokeq(0x800000000005962CULL + 0x08, 0xFBC10160FBE10168ULL);
+        pokeq(0x800000000005962CULL + 0x10, 0xFB610148FB810150ULL);
+        pokeq(0x800000000005962CULL + 0x18, 0xFBA10158F8010180ULL);
+    }
+    else
+    {
+        //Patches by Habib ported to 4.65 (habib_patch = 2 (default) //0=disabled, 1=new patch, 2=new patch except 4.65 Habib Cobra, 3=old patch, 4=no boot speedup patch)
+        if(bEnableLv2_habib_patch == 2 && is_cobra_based() && file_exists("/dev_flash/habib")) ; else
+        if(bEnableLv2_habib_patch >= 1)
+        {
+            if(bEnableLv2_habib_patch == 3)
+                pokeq32(0x800000000005C780ULL, 0x60000000);          // old fix 0x80010017 error  Original: 0x7C7F1B78419E0038ULL
+            else
+                pokeq(0x80000000002BBED0ULL, 0x386000014E800020ULL); // fix 0x80010017 error   Original: 0xFBC1FFF0EBC225B0ULL
+
+            // Booting of game discs and backups speed increased
+            if(bEnableLv2_habib_patch != 4)
+            {
+                pokeq32(0x800000000005C774ULL, 0x38600001);
+                pokeq32(0x800000000005E340ULL, 0x38600000);
+            }
+
+            pokeq(0x800000000005962CULL, 0x386000004E800020ULL);     // fix 0x8001002B error   Original: 0xF821FE917C0802A6ULL
+        }
+    }
 
     /* BASIC PATCHES SYS36 */
     // by 2 anonymous people

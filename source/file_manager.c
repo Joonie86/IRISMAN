@@ -50,6 +50,14 @@
 #include "modules.h"
 #include "psx.h"
 
+#define INITED_CALLBACK     1
+#define INITED_SPU          2
+#define INITED_SOUNDLIB     4
+#define INITED_AUDIOPLAYER  8
+
+#include <spu_soundlib.h>
+#include <audioplayer.h>
+
 void draw_device_mkiso(float x, float y, int index, char *path);
 void load_background_picture();
 
@@ -68,6 +76,9 @@ typedef struct
     // sizes after
     // tracks after
 } __attribute__((packed)) rawseciso_args;
+
+extern u32 snd_inited;
+extern u32 spu;
 
 extern int noBDVD;
 
@@ -135,7 +146,9 @@ extern int bk_picture;
 #define BLINK       0x10
 #define BLINK_SLOW  0x20
 
+#define MOVIAN   "/dev_hdd0/game/HTSS00003/USRDIR/movian.self"
 #define SHOWTIME "/dev_hdd0/game/HTSS00003/USRDIR/showtime.self"
+
 
 ////////////////
 int pos1 = 0;
@@ -147,6 +160,10 @@ int sel2 = 0;
 #define MAX_PATH_LEN   0x420
 
 #ifndef LOADER_MODE
+
+static int audio_pane = 0;
+
+static char audio_file[MAX_PATH_LEN];
 
 static char path1[MAX_PATH_LEN];
 static char path2[MAX_PATH_LEN];
@@ -456,6 +473,41 @@ static msgType mdialogprogress2 =   MSG_DIALOG_DOUBLE_PROGRESSBAR | MSG_DIALOG_M
 
 static volatile int progress_action = 0;
 
+void init_music(int select_song);
+
+void test_audio_file(bool stop_audio)
+{
+    sysUtilCheckCallback();
+    if((snd_inited & INITED_AUDIOPLAYER) && (StatusAudio()==AUDIO_STATUS_EOF || StatusAudio()==AUDIO_STATUS_ERR || stop_audio))
+    {
+        StopAudio(); snd_inited &= ~INITED_AUDIOPLAYER; audio_file[0] = 0;
+
+        bool exit_loop = false; if(stop_audio) return;
+
+        if(audio_pane == 0) {init_music(-1); return;}
+
+        if(audio_pane == 1 && selcount1<1)
+        {
+            while(sel1<nentries1)
+            {
+                sel1++; if(sel1>=nentries1) {sel1=0; if(exit_loop) break; else exit_loop=true;}
+                sprintf(audio_file, "%s/%s", path1, entries1[sel1].d_name);
+                if(strcasestr(entries1[sel1].d_name, ".mp3") || strcasestr(entries1[sel1].d_name, ".ogg")) break;
+            }
+        }
+        if(audio_pane == 2 && selcount2<1)
+        {
+            while(sel2<nentries2)
+            {
+                sel2++; if(sel2>=nentries2) {sel2=0; if(exit_loop) break; else exit_loop=true;}
+                sprintf(audio_file, "%s/%s", path2, entries2[sel2].d_name);
+                if(strcasestr(entries2[sel2].d_name, ".mp3") || strcasestr(entries2[sel2].d_name, ".ogg")) break;
+            }
+        }
+
+        if(PlayAudio(audio_file, 0, AUDIO_ONE_TIME)==0) snd_inited|= INITED_AUDIOPLAYER;
+    }
+}
 static void progress_callback(msgButton button, void *userdata)
 {
     switch(button)
@@ -4016,6 +4068,15 @@ void launch_showtime(bool playmode)
         exit(0);
     }
 
+    if(file_exists(MOVIAN))
+    {
+        fun_exit();
+        SaveGameList();
+
+        sysProcessExitSpawn2((const char*)MOVIAN, NULL, NULL, NULL, 0, 3071, SYS_PROCESS_SPAWN_STACK_SIZE_1M);
+        exit(0);
+    }
+
     if(file_exists(SHOWTIME))
     {
         fun_exit();
@@ -4189,12 +4250,12 @@ mount_iso: ;
             type = mtype;
             is_ps2_game = (type == EMU_PS2_DVD);
         }
-        else if(strstr(path, "/PS3ISO/"))  type = EMU_PS3;
-        else if(strstr(path, "/PS2ISO/")) {type = EMU_PS2_DVD; is_ps2_game = 1;}
-        else if(strstr(path, "/PSPISO/"))  type = EMU_PSP;
-        else if(strstr(path, "/PSXISO/"))  type = EMU_PSX;
-        else if(strstr(path, "/DVDISO/"))  type = EMU_DVD;
-        else if(strstr(path, "/BDISO/"))   type = EMU_BD;
+        else if(strstr(path, "/PS3ISO"))  type = EMU_PS3;
+        else if(strstr(path, "/PS2ISO")) {type = EMU_PS2_DVD; is_ps2_game = 1;}
+        else if(strstr(path, "/PSPISO"))  type = EMU_PSP;
+        else if(strstr(path, "/PSXISO"))  type = EMU_PSX;
+        else if(strstr(path, "/DVDISO"))  type = EMU_DVD;
+        else if(strstr(path, "/BDISO"))   type = EMU_BD;
         else
         {
             FILE *fp = NULL;
@@ -4451,12 +4512,12 @@ int launch_iso_game_mamba(char *path, int mtype)
             type = mtype;
             is_ps2_game = (type == EMU_PS2_DVD);
         }
-        else if(strstr(path, "/PS3ISO/"))  type = EMU_PS3;
-        else if(strstr(path, "/PS2ISO/")) {type = EMU_PS2_DVD; is_ps2_game = 1;}
-        else if(strstr(path, "/PSPISO/"))  type = EMU_PSP;
-        else if(strstr(path, "/PSXISO/"))  type = EMU_PSX;
-        else if(strstr(path, "/DVDISO/"))  type = EMU_DVD;
-        else if(strstr(path, "/BDISO/"))   type = EMU_BD;
+        else if(strstr(path, "/PS3ISO"))  type = EMU_PS3;
+        else if(strstr(path, "/PS2ISO")) {type = EMU_PS2_DVD; is_ps2_game = 1;}
+        else if(strstr(path, "/PSPISO"))  type = EMU_PSP;
+        else if(strstr(path, "/PSXISO"))  type = EMU_PSX;
+        else if(strstr(path, "/DVDISO"))  type = EMU_DVD;
+        else if(strstr(path, "/BDISO"))   type = EMU_BD;
         else
         {
             FILE *fp = NULL;
@@ -5338,6 +5399,8 @@ int file_manager(char *pathw1, char *pathw2)
     mat_win1 = MatrixMultiply(MatrixTranslation(0.0f, 0.0f, 0.0f), MatrixScale(0.5f, 0.75f, 1.0f));
     mat_win2 = MatrixMultiply(MatrixTranslation(848.0f, -256.0f, 0.0f), MatrixScale(0.5f, 0.75f, 1.0f));
 
+    int n, i;
+
     int img_width;
     int FullScreen = 0;
     int png_signal = 0;
@@ -5346,6 +5409,17 @@ int file_manager(char *pathw1, char *pathw2)
 
     if(pathw1) strncpy(path1, pathw1, MAX_PATH_LEN);
     if(pathw2) strncpy(path2, pathw2, MAX_PATH_LEN);
+
+    if(path1[0] == 0)
+    {
+        sprintf(TEMP_PATH, "%s/%s", self_path, "/config/path1.bin");
+        if(file_exists(TEMP_PATH)) {n = MAX_PATH_LEN; char *buff = LoadFile(TEMP_PATH, &n); sprintf(path1, buff); if(buff) free(buff);}
+    }
+    if(path2[0] == 0)
+    {
+        sprintf(TEMP_PATH, "%s/%s", self_path, "/config/path2.bin");
+        if(file_exists(TEMP_PATH)) {n = MAX_PATH_LEN; char *buff = LoadFile(TEMP_PATH, &n); sprintf(path2, buff); if(buff) free(buff);}
+    }
 
     if(path1[0] == 0 || file_exists(path1) == false) strncpy(path1, "/", MAX_PATH_LEN);
     if(path2[0] == 0 || file_exists(path2) == false) strncpy(path2, "/", MAX_PATH_LEN);
@@ -5361,8 +5435,6 @@ int file_manager(char *pathw1, char *pathw2)
 
     update_device_sizes = 1|2; // force update both panes
     ntfs_mount_delay = 2;
-
-    int n, i;
 
     bool ft_update; u8 ft_count = 0;
     ft_update = ((path1[1] == 0) || (path2[1] == 0));
@@ -6521,12 +6593,12 @@ int file_manager(char *pathw1, char *pathw2)
                 {
                     if(exit_option == 1)
                     {
-                        if(DrawDialogYesNo("Exit to XMB?") == YES) {fun_exit(); SaveGameList(); exit(0);}
+                        if(DrawDialogYesNo("Exit to XMB?") == YES) {unlink_secure("/dev_hdd0/tmp/wm_request"); fun_exit(); SaveGameList(); exit(0);}
                     }
                     else
                     if(exit_option == 2)
                     {
-                        if(DrawDialogYesNo("Restart the PS3?") == YES) {fun_exit(); set_install_pkg = true; SaveGameList(); sys_reboot();}
+                        if(DrawDialogYesNo("Restart the PS3?") == YES) {unlink_secure("/dev_hdd0/tmp/wm_request"); fun_exit(); set_install_pkg = true; SaveGameList(); sys_reboot();}
                     }
                     else
                     {
@@ -7150,7 +7222,7 @@ int file_manager(char *pathw1, char *pathw2)
                  }
 
                  //else if(use_cobra && !((!fm_pane && (entries1[sel1].d_type & IS_DIRECTORY)) || (fm_pane && (entries2[sel2].d_type & IS_DIRECTORY))))
-                 else if((!fm_pane && is_ntfs_path(path1)) || ( fm_pane && use_cobra && is_ntfs_path(path2)))
+                 else if(use_cobra && ( (!fm_pane && is_ntfs_path(path1)) || (fm_pane && is_ntfs_path(path2)) ))
                  {
                      sprintf(TEMP_PATH1, "%s/USRDIR/TEMP/pkg.iso", self_path);
 
@@ -7460,6 +7532,24 @@ int file_manager(char *pathw1, char *pathw2)
                 {
                     char *ext = get_extension(entries1[sel1].d_name);
 
+                    if((use_mamba || use_cobra) && !(entries1[sel1].d_type & IS_MARKED) &&
+                           (strcasestr(".mp3|.ogg", ext) != NULL))
+                    {
+                        sprintf(TEMP_PATH, "%s/%s", path1, entries1[sel1].d_name);
+
+                        if((snd_inited & INITED_AUDIOPLAYER) && strcmp(audio_file, TEMP_PATH)==0)
+                        {
+                            StopAudio(); snd_inited &= ~INITED_AUDIOPLAYER;
+                        }
+                        else
+                        {
+                            audio_pane = 1;
+
+                            sprintf(audio_file, "%s", TEMP_PATH);
+                            if(PlayAudio(audio_file, 0, AUDIO_ONE_TIME)==0) snd_inited|= INITED_AUDIOPLAYER;
+                        }
+                    }
+                    else
                     if((use_mamba || use_cobra) && !(entries1[sel1].d_type & IS_MARKED) && is_audiovideo(ext))
                     {
                         sprintf(TEMP_PATH1, "%s/USRDIR/TEMP/showtime.iso", self_path);
@@ -7597,6 +7687,7 @@ int file_manager(char *pathw1, char *pathw2)
                         sprintf(TEMP_PATH, "%s/%s", path1, entries1[sel1].d_name);
 
                         bool reboot=false; int size; char *boot_plugins = LoadFile("/dev_hdd0/boot_plugins.txt", &size);
+                        unlink_secure("/dev_hdd0/tmp/wm_request");
 
                         if(size>=36 && strstr(boot_plugins, "/dev_hdd0/plugins/webftp_server.sprx")!=NULL)
                         {
@@ -8056,6 +8147,24 @@ int file_manager(char *pathw1, char *pathw2)
                 {
                     char *ext = get_extension(entries2[sel2].d_name);
 
+                    if((use_mamba || use_cobra) && !(entries2[sel2].d_type & IS_MARKED) &&
+                           (strcasestr(".mp3|.ogg", ext) != NULL))
+                    {
+                        sprintf(TEMP_PATH, "%s/%s", path2, entries2[sel2].d_name);
+
+                        if((snd_inited & INITED_AUDIOPLAYER) && strcmp(audio_file, TEMP_PATH)==0)
+                        {
+                            StopAudio(); snd_inited &= ~INITED_AUDIOPLAYER;
+                        }
+                        else
+                        {
+                            audio_pane = 2;
+
+                            sprintf(audio_file, "%s", TEMP_PATH);
+                            if(PlayAudio(audio_file, 0, AUDIO_ONE_TIME)==0) snd_inited|= INITED_AUDIOPLAYER;
+                        }
+                    }
+                    else
                     if((use_mamba || use_cobra) && !(entries2[sel2].d_type & IS_MARKED) && is_audiovideo(ext))
                     {
                         sprintf(TEMP_PATH1, "%s/USRDIR/TEMP/showtime.iso", self_path);
@@ -8193,6 +8302,7 @@ int file_manager(char *pathw1, char *pathw2)
                         sprintf(TEMP_PATH, "%s/%s", path2, entries2[sel2].d_name);
 
                         bool reboot=false; int size; char *boot_plugins = LoadFile("/dev_hdd0/boot_plugins.txt", &size);
+                        unlink_secure("/dev_hdd0/tmp/wm_request");
 
                         if(size>=36 && strstr(boot_plugins, "/dev_hdd0/plugins/webftp_server.sprx")!=NULL)
                         {
@@ -8545,9 +8655,16 @@ int file_manager(char *pathw1, char *pathw2)
         }
         }// set menu
 
+        sysUtilCheckCallback();
+        test_audio_file(false);
     }
 
     if(copy_mem) free(copy_mem); copy_mem = NULL;
+
+    sprintf(TEMP_PATH, "%s/%s", self_path, "/config/path1.bin");
+    SaveFile(TEMP_PATH, (char *)path1, MAX_PATH_LEN);
+    sprintf(TEMP_PATH, "%s/%s", self_path, "/config/path2.bin");
+    SaveFile(TEMP_PATH, (char *)path2, MAX_PATH_LEN);
 
     return exitcode;
 }

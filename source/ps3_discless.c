@@ -288,7 +288,7 @@ bool load_ps3_discless_payload()
 
     addr[1]  =  syscall_base;
     addr[2]  += PAYLOAD_BASE; // sys 40
-    addr[3]  =  lv2peek(syscall_base + (u64) (40 * 8));
+    addr[3]  =  lv2peek(syscall_base + (u64) (40  * 8));
     addr[4]  += PAYLOAD_BASE;
     addr[5]  =  lv2peek(syscall_base + (u64) (130 * 8));
     addr[6]  += PAYLOAD_BASE;
@@ -302,13 +302,13 @@ bool load_ps3_discless_payload()
     addr[14] += PAYLOAD_BASE;
     addr[15] =  lv2peek(syscall_base + (u64) (609 * 8));
 
-    for(int n = 0; n < 200; n++)
+    for(u8 n = 0; n < 100; n++)
     {
         lv2poke(0x80000000000004E8ULL, PAYLOAD_BASE);
 
         sys8_memcpyinstr(PAYLOAD_BASE, (u64) addr, (u64) ((ps3_storage_bin_size + 7) & ~7));
 
-        lv2poke(syscall_base + (u64) (40 * 8), PAYLOAD_BASE + 0x10ULL);  // syscall management
+        lv2poke(syscall_base + (u64) (40  * 8), PAYLOAD_BASE + 0x10ULL); // syscall management
         lv2poke(syscall_base + (u64) (130 * 8), PAYLOAD_BASE + 0x20ULL); // sys_event_queue_receive
         lv2poke(syscall_base + (u64) (879 * 8), PAYLOAD_BASE + 0x30ULL); // sys_ss_media_id
         lv2poke(syscall_base + (u64) (864 * 8), PAYLOAD_BASE + 0x40ULL); // storage_manager
@@ -316,7 +316,7 @@ bool load_ps3_discless_payload()
         lv2poke(syscall_base + (u64) (837 * 8), PAYLOAD_BASE + 0x60ULL); // sys_fs_mount
         lv2poke(syscall_base + (u64) (609 * 8), PAYLOAD_BASE + 0x70ULL); // sys_storage_get_device_info
 
-        usleep(10000);
+        usleep(1000);
     }
 
     sleep(1);
@@ -332,9 +332,9 @@ skip_the_load:
 
 bool load_ps3_mamba_payload()
 {
-    //DrawDialogOK("Label1"); 
+    //DrawDialogOK("Label1");
     if(sys8_mamba() == 0x666) return true;  // MAMBA is already running
-    
+
     if(!syscall_base)
     {
         DrawDialogOK("syscall_base is empty!");
@@ -345,17 +345,17 @@ bool load_ps3_mamba_payload()
     sprintf(payload_file, "%s/USRDIR/mamba/mamba_%X.lz.bin", self_path, firmware);
 
 #ifdef LASTPLAY_LOADER
-    //DrawDialogOK("Label2"); 
+    //DrawDialogOK("Label2");
     if(file_exists(payload_file) == false)
         sprintf(payload_file, "/dev_hdd0/game/IRISMAN00/USRDIR/mamba/mamba_%X.lz.bin", firmware);
 #endif
-    //DrawDialogOK("Label3"); 
+    //DrawDialogOK("Label3");
     if(file_exists(payload_file) == false) return false;
 
     write_htab();
 
     u64 *addr = (u64 *) memalign(128, 0x20000);
-    //DrawDialogOK("Label4"); 
+    //DrawDialogOK("Label4");
     if(!addr)
     {
         DrawDialogOK("Memory is full");
@@ -390,7 +390,8 @@ bool load_ps3_mamba_payload()
         exit(0);
     }
 
-    for(int n = 0; n < 100; n++)
+    // install mamba in syscall 40 address ( when mamba is loaded, syscall 40 is disabled and syscalls 6,7,8,9,10,11 are created )
+    for(u8 n = 0; n < 100; n++)
     {
         lv2poke(lv2_mem, lv2_mem + 0x8ULL);
         sys8_memcpy(lv2_mem + 8, (u64) addr, out_size);

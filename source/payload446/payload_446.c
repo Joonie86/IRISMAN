@@ -119,7 +119,7 @@ int is_payload_loaded_446(void)
     if((addr>>32) == 0x534B3145) { // new method to detect the payload
         addr&= 0xffffffff;
         if(addr) {
-            restore_syscall8[0]= SYSCALL_BASE + 64ULL; // (sc8*8)
+            restore_syscall8[0]= SYSCALL_BASE + (u64) (SYSCALL_SK1E * 8ULL); // (8*8)
             restore_syscall8[1]= peekq(restore_syscall8[0]);
             pokeq(restore_syscall8[0], 0x8000000000000000ULL + (u64) (addr + 0x20));
         }
@@ -127,7 +127,7 @@ int is_payload_loaded_446(void)
         return SKY10_PAYLOAD;
     }
 
-    addr = peekq((SYSCALL_BASE + 36 * 8));
+    addr = peekq((SYSCALL_BASE + SYSCALL_36 * 8));
     addr = peekq(addr);
     if(peekq(addr - 0x20) == 0x534B313000000000ULL) //SK10 HEADER
         return SKY10_PAYLOAD;
@@ -233,19 +233,19 @@ void load_payload_446(int mode)
                       (u64) umount_446_bin,
                       umount_446_bin_size);
 
-    restore_syscall8[0]= SYSCALL_BASE + 64ULL; // (sc8*8)
+    restore_syscall8[0]= SYSCALL_BASE + (u64) (SYSCALL_SK1E * 8ULL); // (8*8)
     restore_syscall8[1]= peekq(restore_syscall8[0]);
 
     u64 id[2];
     // copy the id
     id[0]= 0x534B314500000000ULL | (u64) PAYLOAD_OFFSET;
-    id[1] = SYSCALL_BASE + 64ULL; // (sc8*8)
+    id[1] = SYSCALL_BASE + (u64) (SYSCALL_SK1E * 8ULL); // (8*8)
     lv2_memcpy(0x80000000000004f0ULL, (u64) &id[0], 16);
 
     u64 inst8 =  peekq(0x8000000000003000ULL);                     // get TOC
     lv2_memcpy(0x8000000000000000ULL + (u64) (PAYLOAD_OFFSET + 0x28), (u64) &inst8, 8);
     inst8 = 0x8000000000000000ULL + (u64) (PAYLOAD_OFFSET + 0x20); // syscall_8_desc - sys8
-    lv2_memcpy(SYSCALL_BASE + (u64) (8 * 8), (u64) &inst8, 8);
+    lv2_memcpy(SYSCALL_BASE + (u64) (SYSCALL_SK1E * 8ULL), (u64) &inst8, 8);
 
     usleep(1000);
 
@@ -253,7 +253,7 @@ void load_payload_446(int mode)
 
     pokeq(0x80000000007EF000ULL, 0ULL);// BE Emu mount
     pokeq(0x80000000007EF220ULL, 0ULL);
-/*
+
     //Patches from webMAN
     pokeq(0x8000000000297310ULL, 0x4E80002038600000ULL ); // fix 8001003C error
     pokeq(0x8000000000297318ULL, 0x7C6307B44E800020ULL ); // fix 8001003C error
@@ -264,7 +264,7 @@ void load_payload_446(int mode)
     pokeq(0x8000000000056138ULL, 0x2F84000448000098ULL );
     pokeq(0x8000000000059AF4ULL, 0x2F83000060000000ULL );
     pokeq(0x8000000000059B08ULL, 0x2F83000060000000ULL );
-*/
+
     /* BASIC PATCHES SYS36 */
     // by 2 anonymous people
     _poke32(0x56134, 0x60000000); // done

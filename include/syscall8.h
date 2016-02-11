@@ -3,25 +3,25 @@
 Copyright (c) 2010 Hermes <www.elotrolado.net>
 All rights reserved.
 
-Redistribution and use in source and binary forms, with or without modification, are 
+Redistribution and use in source and binary forms, with or without modification, are
 permitted provided that the following conditions are met:
 
-- Redistributions of source code must retain the above copyright notice, this list of 
-  conditions and the following disclaimer. 
-- Redistributions in binary form must reproduce the above copyright notice, this list 
-  of conditions and the following disclaimer in the documentation and/or other 
-  materials provided with the distribution. 
-- The names of the contributors may not be used to endorse or promote products derived 
-  from this software without specific prior written permission. 
+- Redistributions of source code must retain the above copyright notice, this list of
+  conditions and the following disclaimer.
+- Redistributions in binary form must reproduce the above copyright notice, this list
+  of conditions and the following disclaimer in the documentation and/or other
+  materials provided with the distribution.
+- The names of the contributors may not be used to endorse or promote products derived
+  from this software without specific prior written permission.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY 
-EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF 
-MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL 
-THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, 
-PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
-INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, 
-STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF 
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES )(INCLUDING, BUT NOT LIMITED TO,
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
@@ -39,10 +39,15 @@ THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 extern "C" {
 #endif
 
+// Remapper
+#define SYSCALL_36     36ULL
+
+// Sk1e Payload
+#define SYSCALL_SK1E   38ULL
 
 extern int sys8_disable_all; // disable all sys8 functions
 
-/* 
+/*
 
 FUNCTIONS TO USE IN KERNEL AREA 0x8000000000000000 - 0x80000000007fffff
 
@@ -80,29 +85,29 @@ typedef struct
 /* NOTES about path_open_entry:
 
 compare_addr can be a string full path for files or not. The size of the string can be len+1
-replacea_ddr can replace a file, files or directories. The size of the string must be replace_string + hook_open string remnant+1 
+replacea_ddr can replace a file, files or directories. The size of the string must be replace_string + hook_open string remnant+1
 (recommended 0x800 to work with directories)
 
 // example 1: replacing a file
 
-compare_addr: "/app_home/PS3_GAME/USRDIR/EBOOT.BIN" 
-replace_addr: "/dev_usb000/PS3_GAME/USRDIR/EBOOT.BIN" 
+compare_addr: "/app_home/PS3_GAME/USRDIR/EBOOT.BIN"
+replace_addr: "/dev_usb000/PS3_GAME/USRDIR/EBOOT.BIN"
 
 compare_len= strlen(compare_addr);
 replace_len= strlen(replace_addr);
 
 // example 2: replacing files by a unique file
 
-compare_addr: "/app_home/PS3_GAME/ICON" 
-replace_addr: "/dev_usb000/PS3_GAME/ICON0.PNG" 
+compare_addr: "/app_home/PS3_GAME/ICON"
+replace_addr: "/dev_usb000/PS3_GAME/ICON0.PNG"
 
 compare_len= strlen(compare_addr);
 replace_len= strlen(replace_addr)+1;
 
 // example 3: replacing directories
 
-compare_addr: "/app_home/PS3_GAME" 
-replace_addr: "/dev_usb000/PS3_GAME" 
+compare_addr: "/app_home/PS3_GAME"
+replace_addr: "/dev_usb000/PS3_GAME"
 
 compare_len= strlen(compare_addr);
 replace_len= strlen(replace_addr);
@@ -118,7 +123,7 @@ replace_len= strlen(replace_addr);
 int sys8_disable(uint64_t key); // don't supported yet
 
 /*
-	sys8_enable: enable syscalls 6,7, 36 and 8 when 
+	sys8_enable: enable syscalls 6,7, 36 and 8 when
 
 	key: 64 bits key to enable syscalls or 0 to test
 
@@ -309,7 +314,7 @@ To test if syscall8 is working:
 
 	int ret= sys8_enable(0);
 
-	if(ret<0) 
+	if(ret<0)
 		{
 		//try to put the correct key
 
@@ -389,7 +394,7 @@ To test path redirections:
 
 	open_table.entries[0].compare_len= strlen(&open_table.arena[0]);		// 1
 	open_table.entries[0].replace_len= strlen(&open_table.arena[0x800]);
-	
+
 	open_table.entries[1].compare_len= strlen(&open_table.arena[0x100]);	// 2
 	open_table.entries[1].replace_len= strlen(&open_table.arena[0x1000]);
 

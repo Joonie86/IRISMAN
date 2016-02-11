@@ -986,7 +986,11 @@ static int calc_entries(char *path, int parent)
     int len = strlen(path);
 
     // calc folders, subfolders, multi-part files & files
+    #ifdef NOPS3_UPDATE
+    if(len >= 11 && strstr(path + len - 11, "/PS3_UPDATE")) {dir = NULL; nfiles++;}else
+    #endif
     dir = opendir(path);
+
     if(dir)
     {
         int l = len + 1;
@@ -1008,7 +1012,7 @@ static int calc_entries(char *path, int parent)
             path[l] = 0;
             strcat(path, entry->d_name);
 
-            if(stat(path, &s) != SUCCESS) {closedir(dir); DPrintf("Not found: %s\n", path); path[len] = 0; return ERROR_INPUT_FILE_NOT_EXISTS;}
+            if(stat(path, &s) != SUCCESS) continue; //{closedir(dir); DPrintf("Not found: %s\n", path); path[len] = 0; return ERROR_INPUT_FILE_NOT_EXISTS;}
 
             is_dir_entry = entry->d_type & IS_DIRECTORY;
 
@@ -1104,7 +1108,11 @@ static int calc_entries(char *path, int parent)
         {
             mfolders = nfolders; nentries = 0; progress = 100;
 
+            #ifdef NOPS3_UPDATE
+            if(len >= 11 && strstr(path + len - 11, "/PS3_UPDATE")) dir = NULL; else
+            #endif
             dir = opendir(path);
+
             if(dir)
             {
                 int l = len + 1;
@@ -1186,7 +1194,11 @@ static int calc_entries(char *path, int parent)
 
 
             // directories (recursive add)
+            #ifdef NOPS3_UPDATE
+            if(len >= 11 && strstr(path + len - 11, "/PS3_UPDATE")) dir = NULL; else
+            #endif
             dir = opendir(path);
+
             if(dir)
             {
                 mfolders = nfolders; nentries = 0; progress = 100; pcount = 0;
@@ -1531,7 +1543,11 @@ static int fill_entries(char *path1, char *path2, int level)
     DPrintf("%s\n", path1);
 
     // files
+    #ifdef NOPS3_UPDATE
+    if(len >= 11 && strstr(path1 + len - 11, "/PS3_UPDATE")) dir = NULL; else
+    #endif
     dir = opendir(path1);
+
     if(dir)
     {
         int l = len + 1;
@@ -1546,14 +1562,10 @@ static int fill_entries(char *path1, char *path2, int level)
 
             if(get_input_abort()) {closedir(dir); return ERROR_ABORTED_BY_USER;}
 
-            #ifdef NOPS3_UPDATE
-            if(l>=11 && !strcmp(&path1[l - 11], "PS3_UPDATE/")) continue;
-            #endif
-
             path1[l] = 0;
             strcat(path1, entry->d_name);
 
-            if(stat(path1, &s) != SUCCESS) {closedir(dir); DPrintf("Not found: %s\n", path1); path1[len] = 0; return ERROR_INPUT_FILE_NOT_EXISTS;}
+            if(stat(path1, &s) != SUCCESS) continue; //{closedir(dir); DPrintf("Not found: %s\n", path1); path1[len] = 0; return ERROR_INPUT_FILE_NOT_EXISTS;}
 
             if(S_ISDIR(s.st_mode)) continue;
 
@@ -2017,13 +2029,15 @@ static int build_file_iso(int *fd, char *path1, char *path2, int level)
 {
     DIR  *dir;
     struct stat s;
+    struct stat z;
 
     int n;
     int first_file = 1;
     int len1 = strlen(path1);
     int len2 = strlen(path2);
 
-    sprintf(dbhead, "%s - done %i%c", "MAKEPS3ISO Utility", flba * 100 / toc, '%');
+    stat(output_name, &z);
+    sprintf(dbhead, "%s - done %2.1f %%", "MAKEPS3ISO Utility", (double)((double)z.st_size * 100.0f / (double)(toc * 2048ULL)));
 
     DbgHeader(dbhead);
 
@@ -2046,7 +2060,11 @@ static int build_file_iso(int *fd, char *path1, char *path2, int level)
     int len = strlen(path1);
 
     // files
+    #ifdef NOPS3_UPDATE
+    if(len >= 11 && strstr(path1 + len - 11, "/PS3_UPDATE")) dir = NULL; else
+    #endif
     dir = opendir(path1);
+
     if(dir)
     {
         int l = len + 1;
@@ -2061,14 +2079,10 @@ static int build_file_iso(int *fd, char *path1, char *path2, int level)
 
             if(get_input_abort()) {closedir(dir); return ERROR_ABORTED_BY_USER;}
 
-            #ifdef NOPS3_UPDATE
-            if(l>=11 && !strcmp(&path1[l - 11], "PS3_UPDATE/")) continue;
-            #endif
-
             path1[l] = 0;
             strcat(path1, entry->d_name);
 
-            if(stat(path1, &s) != SUCCESS) {closedir(dir); DPrintf("Not found: %s\n", path1); path1[len] = 0; return ERROR_INPUT_FILE_NOT_EXISTS;}
+            if(stat(path1, &s) != SUCCESS) continue; //{closedir(dir); DPrintf("Not found: %s\n", path1); path1[len] = 0; return ERROR_INPUT_FILE_NOT_EXISTS;}
 
             if(S_ISDIR(s.st_mode)) continue;
 
@@ -2151,7 +2165,9 @@ static int build_file_iso(int *fd, char *path1, char *path2, int level)
                 }
             }
 
-            sprintf(dbhead, "%s - done %i%c", "MAKEPS3ISO Utility", flba * 100 / toc, '%');
+            stat(output_name, &z);
+            sprintf(dbhead, "%s - done %2.1f %%", "MAKEPS3ISO Utility", (double)((double)z.st_size * 100.0f / (double)(toc * 2048ULL)));
+
             DbgHeader(dbhead);
 
             if(is_file_split)
@@ -2979,7 +2995,7 @@ static int read_split(u64 position, u8 *mem, int size)
         if(fd_split0 < 0) fd_split0 = ps3ntfs_open(split_file[0].path, O_RDONLY, 0766);
         if(fd_split0 < 0) return ERROR_OPENING_INPUT_FILE;
 
-        if(ps3ntfs_seek64(fd_split0, position, SEEK_SET)<0)
+        if(ps3ntfs_seek64(fd_split0, position, SEEK_SET) < SUCCESS)
         {
             DPrintf("ERROR: in ISO file fseek\n\n");
 
@@ -3030,7 +3046,7 @@ static int read_split(u64 position, u8 *mem, int size)
     //int cur = lba / SPLIT_LBA;
     //int cur2 = (lba + sectors) / SPLIT_LBA;
 
-    if(ps3ntfs_seek64(fd_split, (position - relpos0), SEEK_SET)<0)
+    if(ps3ntfs_seek64(fd_split, (position - relpos0), SEEK_SET) < SUCCESS)
     {
         DPrintf("ERROR: in ISO file fseek\n\n");
 
@@ -3138,7 +3154,7 @@ int extractps3iso(char *f_iso, char *g_path, int split)
     if(n >= 4 && !strcasecmp(&path1[n - 4], ".iso"))
     {
         sprintf(split_file[0].path, "%s", path1);
-        if(stat(split_file[0].path, &s)<0)
+        if(stat(split_file[0].path, &s) < SUCCESS)
         {
             free(split_file); split_file = NULL;
             DPrintf("Error: ISO file don't exists!\n");
@@ -3158,7 +3174,7 @@ int extractps3iso(char *f_iso, char *g_path, int split)
             strcpy(string2, path1);
             string2[n - 2] = 0;
             sprintf(split_file[m].path, "%s.%i", string2, m);
-            if(stat(split_file[m].path, &s)<0) break;
+            if(stat(split_file[m].path, &s) < SUCCESS) break;
             split_file[m].size = s.st_size;
         }
 
@@ -3382,7 +3398,7 @@ int extractps3iso(char *f_iso, char *g_path, int split)
 
         while(true)
         {
-            if(ps3ntfs_seek64(fd, lba * SECTOR_SIZE, SEEK_SET)<0)
+            if(ps3ntfs_seek64(fd, lba * SECTOR_SIZE, SEEK_SET) < SUCCESS)
             {
                 DPrintf("ERROR: in directory_record fseek\n\n");
                 goto err;
@@ -3886,11 +3902,11 @@ static int iso_param_sfo_util(u32 lba, u32 len)
 
 static int iso_patch_exe_error_09(u32 lba, char *filename)
 {
-    if(firmware >= 0x475C) return SUCCESS;
+    if(firmware >= 0x476C) return SUCCESS;
 
     u16 fw_421 = 42100;
-    u16 fw_475 = 47500;
-    u32 offset_fw;
+    u16 fw_476 = 47600;
+    int offset_fw;
     u16 ver = 0;
     int flag = 0;
 
@@ -3906,9 +3922,10 @@ static int iso_patch_exe_error_09(u32 lba, char *filename)
         return FAILED;
     }
 
-    offset_fw = SWAP32(offset_fw);
+    offset_fw = SWAP32(offset_fw); offset_fw -= 0x78;
 
-    offset_fw -= 0x78; if(offset_fw < 0x90 || offset_fw > 0x800) offset_fw = strstr(filename, ".sprx") ? 0x258 : 0x428;
+    retry_offset_iso:
+    if(offset_fw < 0x90 || offset_fw > 0x800) offset_fw = strstr(filename, ".sprx") ? 0x258 : 0x428;
     offset_fw += 6;
 
     if(read_split(file_pos + ((u64) offset_fw), (void *) &ver, (int) 2) < 0)
@@ -3917,11 +3934,11 @@ static int iso_patch_exe_error_09(u32 lba, char *filename)
         return FAILED;
     }
 
-    ver = SWAP16(ver);
+    ver = SWAP16(ver); if(ver % 100) {offset_fw = (offset_fw==0x258) ? 0x278 : 0; goto retry_offset_iso;}
 
     u16 cur_firm = ((firmware>>12) & 0xF) * 10000 + ((firmware>>8) & 0xF) * 1000 + ((firmware>>4) & 0xF) * 100;
 
-    if(firmware >= 0x421C && firmware < 0x475C && ver > fw_421 && ver <= fw_475 && ver > cur_firm)
+    if(firmware >= 0x421C && firmware < 0x476C && ver > fw_421 && ver <= fw_476 && ver > cur_firm)
     {
         DPrintf("Version changed from %u.%u to %u.%u in %s\n\n", ver/10000, (ver % 10000)/100, cur_firm/10000, (cur_firm % 10000)/100, filename);
         cur_firm = SWAP16(cur_firm);
@@ -4021,7 +4038,7 @@ int patchps3iso(char *f_iso, int nopause)
     if(n >= 4 && !strcasecmp(&path1[n - 4], ".iso"))
     {
         sprintf(split_file[0].path, "%s", path1);
-        if(stat(split_file[0].path, &s)<0)
+        if(stat(split_file[0].path, &s) < SUCCESS)
         {
             free(split_file); split_file = NULL;
             DPrintf("Error: ISO file don't exists!\n");
@@ -4041,7 +4058,7 @@ int patchps3iso(char *f_iso, int nopause)
             strcpy(string2, path1);
             string2[n - 2] = 0;
             sprintf(split_file[m].path, "%s.%i", string2, m);
-            if(stat(split_file[m].path, &s)<0) break;
+            if(stat(split_file[m].path, &s) < SUCCESS) break;
             split_file[m].size = s.st_size;
         }
 
@@ -4204,7 +4221,7 @@ int patchps3iso(char *f_iso, int nopause)
 
         while(true)
         {
-            if(ps3ntfs_seek64(fd, lba * SECTOR_SIZE, SEEK_SET)<0)
+            if(ps3ntfs_seek64(fd, lba * SECTOR_SIZE, SEEK_SET) < SUCCESS)
             {
                 DPrintf("ERROR: in directory_record fseek\n\n");
                 goto err;

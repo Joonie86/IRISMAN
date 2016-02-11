@@ -110,12 +110,18 @@ enum RetroModes
     RETRO_DOOM  = 11,
     RETRO_PCE   = 12,
     RETRO_GBC   = 13,
-    RETRO_ATARI = 14,
-    RETRO_VBOY  = 15,
-    RETRO_NXE   = 16,
+    RETRO_VBOY  = 14,
+    RETRO_NXE   = 15,
+    RETRO_ATARI = 16,
     RETRO_WSWAN = 17,
-    RETRO_PSALL = 18,
-    NET_GAMES   = 19,
+    RETRO_A7800 = 18,
+    RETRO_LYNX  = 19,
+    RETRO_GW    = 20,
+    RETRO_VECTX = 21,
+    RETRO_2048  = 22,
+    RETRO_PSALL = 23,
+    NET_GAMES   = 24,
+
 };
 
 enum game_list_categories

@@ -43,13 +43,14 @@
 
 #define SYSCALL_BASE                    0x8000000000363B60ULL // 4.70 CEX
 #define NEW_POKE_SYSCALL                813
-#define NEW_POKE_SYSCALL_ADDR           0x80000000002A1408ULL  // Syscall 813 
+#define NEW_POKE_SYSCALL_ADDR           0x80000000002A1408ULL  // Syscall 813
 
 #define PAYLOAD_OFFSET                  0x3d90
 #define PERMS_OFFSET                    0x3560
 
 #define PAYLOAD_UMOUNT_OFFSET           (0x3d90+0x400)
 #define UMOUNT_SYSCALL_OFFSET           (0x29FB20 + 0x8) // SYSCALL (838) + 8 -> peek(SYSCALL_BASE + 838*8) -> peek(0x363B60 + 0x1A30)
+
 #define LV2MOUNTADDR_470 0x8000000000479FC0ULL //done FIXED!
 //0xff0 => 0x116c (458098 - 459204)
 #define LV2MOUNTADDR_470_ESIZE 0x118
@@ -124,7 +125,7 @@ int is_payload_loaded_470(void)
     if((addr>>32) == 0x534B3145) { // new method to detect the payload
         addr&= 0xffffffff;
         if(addr) {
-            restore_syscall8[0]= SYSCALL_BASE + 64ULL; // (8*8)
+            restore_syscall8[0]= SYSCALL_BASE + (u64) (SYSCALL_SK1E * 8ULL); // (8*8)
             restore_syscall8[1]= peekq(restore_syscall8[0]);
             pokeq(restore_syscall8[0], 0x8000000000000000ULL + (u64) (addr + 0x20));
         }
@@ -132,7 +133,7 @@ int is_payload_loaded_470(void)
         return SKY10_PAYLOAD;
     }
 
-    addr = peekq((SYSCALL_BASE + 36 * 8));
+    addr = peekq((SYSCALL_BASE + SYSCALL_36 * 8));
     addr = peekq(addr);
     if(peekq(addr - 0x20) == 0x534B313000000000ULL) //SK10 HEADER
         return SKY10_PAYLOAD;
@@ -220,24 +221,25 @@ static inline void remove_lv2_memcpy()
     }
 }
 
-
+/*
 static u64 lv1poke(u64 addr, u64 value)
 {
     lv2syscall2(9, (u64) addr, (u64) value);
     return_to_user_prog(u64);
 }
-
+*/
 
 void load_payload_470(int mode)
 {
 /*
-//Remove Lv2 memory protection, NOT needed for REBUG 4.70 
+//Remove Lv2 memory protection, NOT needed for REBUG 4.70
         lv1poke(0x370F28 + 0, 0x0000000000000001ULL); // Original: 0x0000000000351FD8ULL
         lv1poke(0x370F28 + 8, 0xE0D251B556C59F05ULL); // Original: 0x3B5B965B020AE21AULL
         lv1poke(0x370F28 + 16, 0xC232FCAD552C80D7ULL); // Original: 0x7D6F60B118E2E81BULL
         lv1poke(0x370F28 + 24, 0x65140CD200000000ULL); // Original: 0x315D8B7700000000ULL
 */
     install_lv2_memcpy();
+
     /* WARNING!! It supports only payload with a size multiple of 8 */
     lv2_memcpy(0x8000000000000000ULL + (u64) PAYLOAD_OFFSET,
                    (u64) payload_sky_470_bin,
@@ -247,19 +249,19 @@ void load_payload_470(int mode)
                       (u64) umount_470_bin,
                       umount_470_bin_size);
 
-    restore_syscall8[0]= SYSCALL_BASE + 64ULL; // (8*8)
+    restore_syscall8[0]= SYSCALL_BASE + (u64) (SYSCALL_SK1E * 8ULL); // (8*8)
     restore_syscall8[1]= peekq(restore_syscall8[0]);
 
     u64 id[2];
     // copy the id
     id[0]= 0x534B314500000000ULL | (u64) PAYLOAD_OFFSET;
-    id[1] = SYSCALL_BASE + 64ULL; // (8*8)
+    id[1] = SYSCALL_BASE + (u64) (SYSCALL_SK1E * 8ULL); // (8*8)
     lv2_memcpy(0x80000000000004f0ULL, (u64) &id[0], 16);
 
     u64 inst8 =  peekq(0x8000000000003000ULL);                     // get TOC
     lv2_memcpy(0x8000000000000000ULL + (u64) (PAYLOAD_OFFSET + 0x28), (u64) &inst8, 8);
     inst8 = 0x8000000000000000ULL + (u64) (PAYLOAD_OFFSET + 0x20); // syscall_8_desc - sys8
-    lv2_memcpy(SYSCALL_BASE + (u64) (8 * 8), (u64) &inst8, 8);
+    lv2_memcpy(SYSCALL_BASE + (u64) (SYSCALL_SK1E * 8ULL), (u64) &inst8, 8);
 
     usleep(1000);
 
@@ -285,8 +287,8 @@ void load_payload_470(int mode)
 
     /* BASIC PATCHES SYS36 */
     // by 2 anonymous people
-    _poke32(0x565FC, 0x60000000);             // 
-    PATCH_JUMP(0x56604, 0x5669C);             // 
+    _poke32(0x565FC, 0x60000000);             //
+    PATCH_JUMP(0x56604, 0x5669C);             //
     _poke32(0x5A6E0,  0x60000000);            // fix 80010009 error
     _poke32(0x5A6F4,  0x60000000);            // fix 80010019 error
     _poke(  0x56588,  0x63FF003D60000000); // fix 8001003D error  "ori     %r31, %r31, 0x3D\n nop\n" done

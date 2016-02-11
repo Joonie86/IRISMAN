@@ -10,8 +10,8 @@
 #define SYS36_PAYLOAD -1
 #define WANIN_PAYLOAD -2
 
-extern int is_firm_476(void);
 extern int is_firm_475(void);
+extern int is_firm_476(void);
 extern void set_bdvdemu_475(int current_payload);
 extern void load_payload_475(int mode);
 extern int is_payload_loaded_475(void);

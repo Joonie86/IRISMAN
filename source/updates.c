@@ -31,6 +31,8 @@ extern char self_path[MAXPATHLEN];
 extern char covers_path[MAXPATHLEN];
 extern char updates_path[MAXPATHLEN];
 
+extern bool show_http_errors;
+
 #define MEM_MESSAGE_OFFSET  0x400
 #define TEMP_PATH1_OFFSET   0x1400
 #define TEMP_PATH2_OFFSET   0x1800
@@ -220,13 +222,13 @@ static int download_update(char *url, char *file, int mode, u64 *size)
     }
 
     http_p = malloc(0x10000);
-    if(!http_p) {DrawDialogOKTimer("Error malloc", 2000.0f); ret= -1; goto err;}
+    if(!http_p) {if(show_http_errors) DrawDialogOKTimer("Error malloc", 2000.0f); ret= -1; goto err;}
 
     ssl_p = malloc(0x40000);
-    if(!ssl_p) {DrawDialogOKTimer("Error malloc", 2000.0f); ret= -2; goto err;}
+    if(!ssl_p) {if(show_http_errors) DrawDialogOKTimer("Error malloc", 2000.0f); ret= -2; goto err;}
 
     ret = httpInit(http_p, 0x10000);
-    if (ret < 0) {DrawDialogOKTimer("Error httpInit", 2000.0f); goto err;}
+    if (ret < 0) {if(show_http_errors) DrawDialogOKTimer("Error httpInit", 2000.0f); goto err;}
     flags|= 1;
 
     // SSL
@@ -249,12 +251,12 @@ static int download_update(char *url, char *file, int mode, u64 *size)
     caList.size = cert_size;
 
     ret = httpsInit(1, (const httpsData *) &caList);
-    if (ret < 0) {DrawDialogOKTimer("Error httpsInit", 2000.0f); goto err;}
+    if (ret < 0) {if(show_http_errors) DrawDialogOKTimer("Error httpsInit", 2000.0f); goto err;}
     flags|= 4;
     //
 
     ret = httpCreateClient(&clientID);
-    if (ret < 0) {DrawDialogOKTimer("Error httpCreateClient", 2000.0f); goto err;}
+    if (ret < 0) {if(show_http_errors) DrawDialogOKTimer("Error httpCreateClient", 2000.0f); goto err;}
     flags|= 8;
 
     httpClientSetConnTimeout(clientID, 10000000);
@@ -262,22 +264,22 @@ static int download_update(char *url, char *file, int mode, u64 *size)
     httpClientSetUserAgent(clientID, "Mozilla/5.0 (Windows NT 6.1; rv:21.0) Gecko/20100101 Firefox/27.0");
 
     ret = httpUtilParseUri(NULL, url, NULL, 0, &pool_size);
-    if (ret < 0) {DrawDialogOKTimer("Error init httpUtilParseUri", 2000.0f); goto err;}
+    if (ret < 0) {if(show_http_errors) DrawDialogOKTimer("Error init httpUtilParseUri", 2000.0f); goto err;}
 
     uri_p = malloc(pool_size);
-    if (!uri_p)  {DrawDialogOKTimer("Error malloc", 2000.0f); goto err;}
+    if (!uri_p)  {if(show_http_errors) DrawDialogOKTimer("Error malloc", 2000.0f); goto err;}
 
     ret = httpUtilParseUri(&uri, url, uri_p, pool_size, NULL);
-    if (ret < 0) {DrawDialogOKTimer("Error httpUtilParseUri", 2000.0f); goto err;}
+    if (ret < 0) {if(show_http_errors) DrawDialogOKTimer("Error httpUtilParseUri", 2000.0f); goto err;}
 
     ret = httpCreateTransaction(&transID, clientID, HTTP_METHOD_GET, &uri);
-    if (ret < 0) {DrawDialogOKTimer("Error httpCreateTransaction", 2000.0f); goto err;}
+    if (ret < 0) {if(show_http_errors) DrawDialogOKTimer("Error httpCreateTransaction", 2000.0f); goto err;}
 
     ret = httpSendRequest(transID, NULL, 0, NULL);
-    if (ret < 0) {DrawDialogOKTimer("Error httpSendRequest", 2000.0f); goto err;}
+    if (ret < 0) {if(show_http_errors) DrawDialogOKTimer("Error httpSendRequest", 2000.0f); goto err;}
 
     ret = httpResponseGetStatusCode(transID, &code);
-    if (ret < 0) {DrawDialogOKTimer("Error httpResponseGetStatusCode", 2000.0f); goto err;}
+    if (ret < 0) {if(show_http_errors) DrawDialogOKTimer("Error httpResponseGetStatusCode", 2000.0f); goto err;}
 
     if (code == 404) {ret = -4; goto err;}
     if (code == 403) {ret = -4; goto err;}
@@ -287,7 +289,7 @@ static int download_update(char *url, char *file, int mode, u64 *size)
         if (ret == HTTP_STATUS_CODE_No_Content) {
             length = 0ULL;
             ret = 0;
-        } else {DrawDialogOKTimer("Error httpResponseGetContentLength", 2000.0f); goto err;}
+        } else {if(show_http_errors) DrawDialogOKTimer("Error httpResponseGetContentLength", 2000.0f); goto err;}
     }
 
     if(size) *size = length;
@@ -302,7 +304,7 @@ static int download_update(char *url, char *file, int mode, u64 *size)
     }
 
     fp = fopen(file, "wb");
-    if(!fp) {DrawDialogOKTimer("Error saving file", 2000.0f); goto err;}
+    if(!fp) {if(show_http_errors) DrawDialogOKTimer("Error saving file", 2000.0f); goto err;}
 
     int acum = 0;
     while (recv != 0 && length != 0ULL)
@@ -462,14 +464,14 @@ int download_file(char *url, char *file, int mode, u64 *size)
     }
 
     http_p = malloc(0x10000);
-    if(!http_p) {DrawDialogOKTimer("Error malloc", 2000.0f); ret= -1; goto err;}
+    if(!http_p) {if(show_http_errors) DrawDialogOKTimer("Error malloc", 2000.0f); ret= -1; goto err;}
 
     ret = httpInit(http_p, 0x10000);
-    if (ret < 0) {DrawDialogOKTimer("Error httpInit", 2000.0f); goto err;}
+    if (ret < 0) {if(show_http_errors) DrawDialogOKTimer("Error httpInit", 2000.0f); goto err;}
     flags|= 1;
 
     ret = httpCreateClient(&clientID);
-    if (ret < 0) {DrawDialogOKTimer("Error httpCreateClient", 2000.0f); goto err;}
+    if (ret < 0) {if(show_http_errors) DrawDialogOKTimer("Error httpCreateClient", 2000.0f); goto err;}
     flags|= 2;
 
     httpClientSetConnTimeout(clientID, 20000000);
@@ -477,24 +479,24 @@ int download_file(char *url, char *file, int mode, u64 *size)
     httpClientSetUserAgent(clientID, TITLE_APP);
 
     ret = httpUtilParseUri(NULL, url, NULL, 0, &pool_size);
-    if (ret < 0) {DrawDialogOKTimer("Error init httpUtilParseUri", 2000.0f); goto err;}
+    if (ret < 0) {if(show_http_errors) DrawDialogOKTimer("Error init httpUtilParseUri", 2000.0f); goto err;}
 
     uri_p = malloc(pool_size);
-    if (!uri_p)  {DrawDialogOKTimer("Error malloc", 2000.0f); goto err;}
+    if (!uri_p)  {if(show_http_errors) DrawDialogOKTimer("Error malloc", 2000.0f); goto err;}
 
     ret = httpUtilParseUri(&uri, url, uri_p, pool_size, NULL);
-    if (ret < 0) {DrawDialogOKTimer("Error httpUtilParseUri", 2000.0f); goto err;}
+    if (ret < 0) {if(show_http_errors) DrawDialogOKTimer("Error httpUtilParseUri", 2000.0f); goto err;}
 
     ret = httpCreateTransaction(&transID, clientID, HTTP_METHOD_GET, &uri);
-    if (ret < 0) {DrawDialogOKTimer("Error httpCreateTransaction", 2000.0f); goto err;}
+    if (ret < 0) {if(show_http_errors) DrawDialogOKTimer("Error httpCreateTransaction", 2000.0f); goto err;}
     flags|= 4;
 
     ret = httpSendRequest(transID, NULL, 0, NULL);
-    if (ret < 0) {DrawDialogOKTimer("Error httpSendRequest", 2000.0f); goto err;}
+    if (ret < 0) {if(show_http_errors) DrawDialogOKTimer("Error httpSendRequest", 2000.0f); goto err;}
     flags|= 8;
 
     ret = httpResponseGetStatusCode(transID, &code);
-    if (ret < 0) {DrawDialogOKTimer("Error httpResponseGetStatusCode", 2000.0f); goto err;}
+    if (ret < 0) {if(show_http_errors) DrawDialogOKTimer("Error httpResponseGetStatusCode", 2000.0f); goto err;}
 
     if (code == 404) {ret = -4; goto err;}
     if (code == 403) {ret = -4; goto err;}
@@ -532,7 +534,7 @@ int download_file(char *url, char *file, int mode, u64 *size)
     if(!file) goto err;
 
     fp = fopen(file, "wb");
-    if(!fp) {DrawDialogOKTimer("Error saving file", 2000.0f); goto err;}
+    if(!fp) {if(show_http_errors) DrawDialogOKTimer("Error saving file", 2000.0f); goto err;}
 
     if(!strncmp(file, "/dev_hdd0", 9)) sysFsChmod(file, FS_S_IFMT | 0777);
 
@@ -974,7 +976,7 @@ int covers_update(int pass)
 
     if(count == 0)
     {
-        DrawDialogOKTimer("PS3 Games Not Found", 2000.0f);
+        if(show_http_errors) DrawDialogOKTimer("PS3 Games Not Found", 2000.0f);
         return 0;
     }
 
@@ -1137,9 +1139,9 @@ int game_update(char *title_id)
         wait_event_thread();
         get_games();
 
-        DrawDialogOKTimer("Cover Downloaded", 2000.0f);
+        if(show_http_errors) DrawDialogOKTimer("Cover Downloaded", 2000.0f);
     }
-    else if (ret == -2) DrawDialogOKTimer("Invalid Cover", 2000.0f);
+    else if (ret == -2) if(show_http_errors) DrawDialogOKTimer("Invalid Cover", 2000.0f);
 
     sprintf(temp_buffer, "Do you want you update the game %s?", title_id);
     if(DrawDialogYesNoDefaultYes(temp_buffer) != YES) return 0;
@@ -1245,8 +1247,8 @@ no_system:
 
     if(max_list > 0)
     {
-        DrawDialogOKTimer("Downloading the updates...\n\n"
-                          "Wait to finish", 2000.0f);
+        if(show_http_errors) DrawDialogOKTimer("Downloading the updates...\n\n"
+                                               "Wait to finish", 2000.0f);
 
         //sprintf(TEMP_PATH1, "%s/PKG", self_path);
         sprintf(TEMP_PATH1, updates_path);

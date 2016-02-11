@@ -41,6 +41,17 @@
 
 #include <io/pad.h>
 
+u32 snd_inited = 0;
+
+#define INITED_CALLBACK     1
+#define INITED_SPU          2
+#define INITED_SOUNDLIB     4
+#define INITED_AUDIOPLAYER  8
+
+#include <sysutil/sysutil.h>
+#include <spu_soundlib.h>
+#include <audioplayer.h>
+
 #include <tiny3d.h>
 #include "libfont2.h"
 #include "language.h"
@@ -75,6 +86,7 @@
 #include "payload470dex/payload_470dex.h"
 #include "payload475/payload_475.h"
 #include "payload475dex/payload_475dex.h"
+#include "payload478deh/payload_478deh.h"
 
 #include "spu_soundmodule.bin.h" // load SPU Module
 #include "spu_soundlib.h"
@@ -204,6 +216,9 @@ bool allow_save_lastgame = false;
 bool cached_game_list = false; //only once
 bool found_game_insert = false;
 bool found_game_remove = false;
+bool do_once = true;
+
+bool show_http_errors = false;
 
 // grid config for gui1
 int cols = 4, rows = 3;
@@ -226,7 +241,6 @@ bool save_game_list_after_refresh = false;
 bool is_ps3game_running = false;
 
 int game_list_category = GAME_LIST_ALL;
-
 
 int mode_homebrew = GAMEBASE_MODE;
 int homelaun = 0;
@@ -280,9 +294,10 @@ void draw_background_pic1();
 void load_background_picture();
 
 void mount_iso_game();
+void test_audio_file();
 
 // music
-#define MAX_SONGS 50
+#define MAX_SONGS 100
 
 int song_selected = 0;
 
@@ -363,6 +378,7 @@ int  retro_mode = RETRO_ALL;
 int  roms_count = 0;
 int  max_roms = 80;
 
+// retroArch cores 1.0
 char retro_root_path[ROMS_MAXPATHLEN];
 char retro_snes_path[ROMS_MAXPATHLEN];
 char retro_gba_path[ROMS_MAXPATHLEN];
@@ -380,6 +396,12 @@ char retro_vb_path[ROMS_MAXPATHLEN];
 char retro_nxe_path[ROMS_MAXPATHLEN];
 char retro_wswan_path[ROMS_MAXPATHLEN];
 
+// retroArch cores 1.2
+char retro_a7800_path[ROMS_MAXPATHLEN];
+char retro_lynx_path[ROMS_MAXPATHLEN];
+char retro_gw_path[ROMS_MAXPATHLEN];
+char retro_vectrex_path[ROMS_MAXPATHLEN];
+char retro_2048_path[ROMS_MAXPATHLEN];
 
 #define GUI_SECTION "GUI"
 
@@ -404,6 +426,8 @@ bool bLoadMambaAndQuit = false;
 u8 bEnableLv2_memprot_patch  = 0;
 u8 bEnableLv2_webman_patch   = 1;
 u8 bEnableLv2_habib_patch    = 2;
+
+u8 ftp_serv = 0;
 
 u32 spoof_version  = 0;
 u32 spoof_revision = 0;
@@ -431,6 +455,41 @@ char temp_buffer[8192];
 //void MSGBOX2(char *text, int i) {sprintf(temp_buffer, "%s = %i", text, i); DrawDialogOKTimer(temp_buffer, 5000.0f);}    //debug message
 
 //int load_boot_prx(char * config_path);
+
+LV2_SYSCALL wm_sys_storage_ext_umount_discfile(void)
+{
+    lv2syscall1(8, SYSCALL8_OPCODE_UMOUNT_DISCFILE);
+    return_to_user_prog(s32);
+}
+
+static void do_umount_iso(void)
+{
+	unsigned int real_disctype, effective_disctype, iso_disctype;
+
+	cobra_get_disc_type(&real_disctype, &effective_disctype, &iso_disctype);
+
+	// If there is an effective disc in the system, it must be ejected
+	if(effective_disctype != DISC_TYPE_NONE)
+	{
+		cobra_send_fake_disc_eject_event();
+		usleep(4000);
+	}
+
+	if(iso_disctype != DISC_TYPE_NONE) cobra_umount_disc_image();
+
+	// If there is a real disc in the system, issue an insert event
+	if(real_disctype != DISC_TYPE_NONE)
+	{
+		cobra_send_fake_disc_insert_event();
+		for(u8 m=0; m<22; m++)
+		{
+			usleep(4000);
+
+			if(file_exists("/dev_bdvd")) break;
+		}
+		cobra_disc_auth();
+	}
+}
 
 LV2_SYSCALL sys_storage_ext_fake_storage_event(uint64_t event, uint64_t param, uint64_t device)
 {
@@ -765,7 +824,6 @@ int get_icon(char * path, const int num_dir)
         if(p)
         {
             snprintf(titleid, 10, "%s", p + 1);
-            DrawDialogTimer(titleid, 3000.0f);
             sprintf(path, "%s%s.JPG", covers_path, titleid);
             if(file_exists(path)) return 1;
             sprintf(path, "%s%s.PNG", covers_path, titleid);
@@ -783,7 +841,7 @@ int get_icon(char * path, const int num_dir)
         return SUCCESS;
     }
 
-    if(cover_mode == 0 && ((directories[num_dir].flags & (GAME_FLAGS)) == (PS3_FLAG)) && strstr(directories[num_dir].path_name, "/PS3ISO/") != NULL)
+    if(cover_mode == 0 && ((directories[num_dir].flags & (GAME_FLAGS)) == (PS3_FLAG)) && strstr(directories[num_dir].path_name, "/PS3ISO") != NULL)
         return GET_ICON_FROM_ISO;
 
     if((directories[num_dir].flags & (PSP_FLAG | RETRO_FLAG | PS2_CLASSIC_FLAG)) == (PSP_FLAG | RETRO_FLAG | PS2_CLASSIC_FLAG))
@@ -1757,6 +1815,7 @@ struct {
     int filter_by_device;
     int filter_by_letter;
     u8  global_bd_mirror;
+    u8  global_wm_autoplay;
 } manager_cfg;
 
 struct {
@@ -1834,6 +1893,7 @@ void LoadManagerCfg()
             manager_cfg.filter_by_device = LIST_ALL_DEVICES;
             manager_cfg.filter_by_letter = filter_by_letter;
             manager_cfg.global_bd_mirror = 0;
+            manager_cfg.global_wm_autoplay = 0;
 
             manager_cfg.mode_homebrew = GAMEBASE_MODE;
             manager_cfg.game_list_category = GAME_LIST_ALL;
@@ -1857,6 +1917,7 @@ void LoadManagerCfg()
         manager_cfg.filter_by_device = LIST_ALL_DEVICES;
         manager_cfg.filter_by_letter = filter_by_letter;
         manager_cfg.global_bd_mirror = 0;
+        manager_cfg.global_wm_autoplay = 0;
 
         manager_cfg.mode_homebrew = GAMEBASE_MODE;
         manager_cfg.game_list_category = GAME_LIST_ALL;
@@ -1944,6 +2005,15 @@ void fun_exit()
         SND_End();
     }
 
+    if(snd_inited & INITED_SOUNDLIB)
+        SND_End();
+
+	if(snd_inited & INITED_CALLBACK)
+        sysUtilUnregisterCallback(SYSUTIL_EVENT_SLOT0);
+
+	if(snd_inited & INITED_AUDIOPLAYER)
+        StopAudio();
+
     if(inited & INITED_SPU)
     {
         sleep(1);
@@ -2008,6 +2078,7 @@ void fun_exit()
     if(set_install_pkg)
     {
         unlink_secure("/dev_hdd0/tmp/turnoff");
+        unlink_secure("/dev_hdd0/tmp/wm_request");
     }
 
     sys8_perm_mode(0); // perms to 0 from exit()
@@ -2036,6 +2107,21 @@ void fun_exit()
 
 }
 
+static void sys_callback(uint64_t status, uint64_t param, void* userdata) {
+
+     switch (status) {
+		case SYSUTIL_EXIT_GAME:
+
+			fun_exit();
+			sysProcessExit(1);
+			break;
+
+       default:
+		   break;
+
+	}
+}
+
 #ifndef LOADER_MODE
 void show_ftp_error(int r)
 {
@@ -2054,8 +2140,10 @@ void auto_ftp(void)
     if(!one) goto ftp_net;
 
     one = 0;
-    if (manager_cfg.opt_flags & OPTFLAGS_FTP) // maybe we need add an icon to user...
+    if (ftp_serv || (manager_cfg.opt_flags & OPTFLAGS_FTP)) // maybe we need add an icon to user...
     {
+        manager_cfg.opt_flags |= OPTFLAGS_FTP;
+
         int r = ftp_init();
 
         if(r == SUCCESS) ftp_inited = true; //DrawDialogOK("FTP Service init on boot: OK");
@@ -2171,7 +2259,7 @@ void LoadGameList()
         }
         else free(file);
 
-        //delete_entries(directories, &ndirectories, 0);
+        delete_entries(directories, &ndirectories, 0);
         sort_entries2(directories, &ndirectories, sort_mode);
 
         cached_game_list = true;
@@ -2525,6 +2613,45 @@ int get_net_status()
 
 void init_music(int select_song)
 {
+    test_audio_file(true); // stop mp3/ogg
+
+    if(select_song < 0 && (manager_cfg.opt_flags & OPTFLAGS_PLAYMUSIC))
+    {
+        sprintf(tmp_path, "%s/USRDIR/music/music.mp3", self_path);
+        if(PlayAudio(tmp_path, 0, AUDIO_ONE_TIME)==0) {snd_inited|= INITED_AUDIOPLAYER; return;}
+        sprintf(tmp_path, "%s/USRDIR/music/music.ogg", self_path);
+        if(PlayAudio(tmp_path, 0, AUDIO_ONE_TIME)==0) {snd_inited|= INITED_AUDIOPLAYER; return;}
+
+        srand(time(0)); // randomize seed
+
+        int song_index = rand() % MAX_SONGS;
+
+        do
+        {
+            sprintf(tmp_path, "%s/USRDIR/music/music%i.mp3", self_path, song_index + 1);
+            if(PlayAudio(tmp_path, 0, AUDIO_ONE_TIME)==0) {snd_inited|= INITED_AUDIOPLAYER; song_selected = song_index; return;}
+            sprintf(tmp_path, "%s/USRDIR/music/music%i.ogg", self_path, song_index + 1);
+            if(PlayAudio(tmp_path, 0, AUDIO_ONE_TIME)==0) {snd_inited|= INITED_AUDIOPLAYER; song_selected = song_index; return;}
+            if(song_index > 10) song_index = rand() % MAX_SONGS; else song_index--;
+        }
+        while(song_index > 0);
+    }
+
+    if(select_song >= 0 && select_song < MAX_SONGS)
+    {
+        song_selected = select_song;
+
+        do
+        {
+            sprintf(tmp_path, "%s/USRDIR/music/music%i.mp3", self_path, song_selected + 1);
+            if(PlayAudio(tmp_path, 0, AUDIO_ONE_TIME)==0) {snd_inited|= INITED_AUDIOPLAYER; return;}
+            sprintf(tmp_path, "%s/USRDIR/music/music%i.ogg", self_path, song_selected + 1);
+            if(PlayAudio(tmp_path, 0, AUDIO_ONE_TIME)==0) {snd_inited|= INITED_AUDIOPLAYER; return;}
+            song_selected--;
+        }
+        while(song_selected > 0);
+    }
+
     MODPlay_Init(&mod_track);
 
     int file_size;
@@ -2540,6 +2667,19 @@ void init_music(int select_song)
             sprintf(tmp_path, "%s/MUSIC.MOD", self_path);
             file = LoadFile(tmp_path, &file_size);
         }
+    }
+
+    if(select_song >= 0 && select_song < MAX_SONGS)
+    {
+        song_selected = select_song;
+
+        do
+        {
+            sprintf(tmp_path, "%s/USRDIR/music/music%i.mod", self_path, song_selected + 1);
+            file = LoadFile(tmp_path, &file_size);
+            if(!file) song_selected--;
+        }
+        while(!file && song_selected > 0);
     }
 
     if(select_song >= 0 && select_song < MAX_SONGS)
@@ -2920,7 +3060,7 @@ void parse_mygames_xml()
         char *pos = strstr(directories[ndirectories].path_name, "?");
         if(pos) *pos = 0;
 
-        sprintf(directories[ndirectories].title, "%s", get_filename(directories[ndirectories].path_name));
+        sprintf(directories[ndirectories].title, "%s", str_replace(get_filename(directories[ndirectories].path_name), "%20", " "));
 
         directories[ndirectories].title[63] = 0;
 
@@ -2954,8 +3094,8 @@ void read_settings()
     char InstallMamba[2] = "1";
     char LoadMambaAndQuit[2] = "0";
 
-    spoof_version  = 0x475;
-    spoof_revision = 65242;
+    spoof_version  = 0x476;
+    spoof_revision = 65514;
 
     // set default values
     sprintf(covers_path, "%s/USRDIR/covers/", MM_PATH);
@@ -2969,7 +3109,7 @@ void read_settings()
     strcpy(ps2classic_path, "/PS2ISO");
     sprintf(psxiso_path, "%s/USRDIR/ps1_iso", self_path);
 
-    strcpy(retro_root_path, "/ROMS/");
+    sprintf(retro_root_path, "/ROMS/");
     sprintf(retro_snes_path, "%sSNES", retro_root_path);
     sprintf(retro_gba_path, "%sGBA", retro_root_path);
     sprintf(retro_gen_path, "%sGEN", retro_root_path);
@@ -2985,6 +3125,12 @@ void read_settings()
     sprintf(retro_vb_path, "%sVB", retro_root_path);
     sprintf(retro_nxe_path, "%sNXE", retro_root_path);
     sprintf(retro_wswan_path, "%sWSWAN", retro_root_path);
+
+    sprintf(retro_a7800_path, "%sA7800", retro_root_path);
+    sprintf(retro_lynx_path, "%sLYNX", retro_root_path);
+    sprintf(retro_gw_path, "%sGW", retro_root_path);
+    sprintf(retro_vectrex_path, "%sVECTX", retro_root_path);
+    sprintf(retro_2048_path, "%s2048",  retro_root_path);
 
     strcpy(video_extensions, ".MKV .MP4 .AVI .MPG .MPEG .MOV .M2TS .VOB .FLV .WMV .ASF .DIVX .XVID .PAM .BIK .BINK .VP6 .MTH .3GP .RMVB .OGM .OGV .M2T .MTS .TS .TSV .TSA .TTS .RM .RV .VP3 .VP5 .VP8 .264 .M1V .M2V .M4B .M4P .M4R .M4V .MP4V .MPE .BDMV .DVB .WEBM .NSV");
     strcpy(audio_extensions, ".MP3 .WAV .WMA .AAC .AC3 .AT3 .OGG .OGA .MP2 .MPA .M4A .FLAC .RA .RAM .AIF .AIFF .MOD .S3M .XM .IT .MTM .STM .UMX .MO3 .NED .669 .MP1 .M1A .M2A .M4B .AA3 .OMA .AIFC");
@@ -3063,6 +3209,12 @@ void read_settings()
         getConfigMemValueString((char *) file, file_size, ROMS_SECTION, "NXE", retro_nxe_path, ROMS_MAXPATHLEN - 1, retro_nxe_path);
         getConfigMemValueString((char *) file, file_size, ROMS_SECTION, "WSWAN", retro_wswan_path, ROMS_MAXPATHLEN - 1, retro_wswan_path);
 
+        getConfigMemValueString((char *) file, file_size, ROMS_SECTION, "A7800", retro_a7800_path, ROMS_MAXPATHLEN - 1, retro_a7800_path);
+        getConfigMemValueString((char *) file, file_size, ROMS_SECTION, "LYNX", retro_lynx_path, ROMS_MAXPATHLEN - 1, retro_lynx_path);
+        getConfigMemValueString((char *) file, file_size, ROMS_SECTION, "GW", retro_gw_path, ROMS_MAXPATHLEN - 1, retro_gw_path);
+        getConfigMemValueString((char *) file, file_size, ROMS_SECTION, "VECTX", retro_vectrex_path, ROMS_MAXPATHLEN - 1, retro_vectrex_path);
+        getConfigMemValueString((char *) file, file_size, ROMS_SECTION, "2048", retro_2048_path, ROMS_MAXPATHLEN - 1, retro_2048_path);
+
         max_roms = getConfigMemValueInt((char *) file, file_size, ROMS_SECTION, "MaxRoms", 80);
 
         getConfigMemValueString((char *) file, file_size, GUI_SECTION, "AddToLastGameApp", AddToLastGameApp, 2, AddToLastGameApp);
@@ -3086,7 +3238,9 @@ void read_settings()
         getConfigMemValueString((char *) file, file_size, GUI_SECTION, "InstallMamba", InstallMamba, 2, InstallMamba);
 #endif
 
+        ftp_serv = getConfigMemValueInt((char *) file, file_size, GUI_SECTION, "FTPserver", 0);
         ftp_port = getConfigMemValueInt((char *) file, file_size, GUI_SECTION, "FTPport", 21);
+
         default_psxoptions = getConfigMemValueInt((char *) file, file_size, GUI_SECTION, "DefaultPSXOptions", 1); //ps1_netemu
 
         CoverflowSize = getConfigMemValueInt((char *) file, file_size, GUI_SECTION, "CoverflowSize", 10);
@@ -3208,7 +3362,7 @@ void clear_game_list()
 //////
 
 static char str_home[5][10] = {" Homebrew", "", " PS3", " Retro", " Videos"};
-static char str_retro_mode[20][6] = {"", "PSX", "PS2", "PSP", "SNES", "GBA", "GEN", "NES", "MAME", "FBA", "Quake", "Doom", "PCE", "GBC", "Atari", "VBoy", "NXE", "WSwan", "", "NET"};
+static char str_retro_mode[25][6] = {"", "PSX", "PS2", "PSP", "SNES", "GBA", "GEN", "NES", "MAME", "FBA", "Quake", "Doom", "PCE", "GBC", "Atari", "VBoy", "NXE", "WSwan", "A7800", "Lynx", "G&W", "VECTX", "2048", "", "NET"};
 
 s32 main(s32 argc, const char* argv[])
 {
@@ -3264,6 +3418,11 @@ s32 main(s32 argc, const char* argv[])
     inited |= INITED_SPU;
 
     if(SND_Init(spu) == SUCCESS) inited |= INITED_SOUNDLIB;
+
+    // register exit callback
+    if(sysUtilRegisterCallback(SYSUTIL_EVENT_SLOT0, sys_callback, NULL)==0) snd_inited |= INITED_CALLBACK;
+    if(SND_Init(spu)==0) snd_inited |= INITED_SOUNDLIB;
+    SND_Pause(0);
 
     if(argc > 0 && argv)
     {
@@ -3490,7 +3649,7 @@ s32 main(s32 argc, const char* argv[])
         off_psid  = off_idps2 + 0x18ULL;
         payload_mode = is_payload_loaded_460dex();
     }
-	else if(is_firm_460deh())
+    else if(is_firm_460deh())
     {
         firmware  = 0x460E;
         //fw_ver    = 0xB798;
@@ -3562,15 +3721,6 @@ s32 main(s32 argc, const char* argv[])
         off_psid  = off_idps2 + 0x18ULL;
         payload_mode = is_payload_loaded_475();
     }
-    else if(is_firm_476())
-    {
-        firmware  = 0x476C;
-        //fw_ver    = 0xB98C;
-        off_idps  = 0x80000000003E2E30ULL;
-        off_idps2 = 0x8000000000474AF4ULL;
-        off_psid  = off_idps2 + 0x18ULL;
-        payload_mode = is_payload_loaded_475();
-    }	
     else if(is_firm_475dex())
     {
         firmware  = 0x475D;
@@ -3579,6 +3729,33 @@ s32 main(s32 argc, const char* argv[])
         off_idps2 = 0x800000000049CAF4ULL;
         off_psid  = off_idps2 + 0x18ULL;
         payload_mode = is_payload_loaded_475dex();
+    }
+    else if(is_firm_476())
+    {
+        firmware  = 0x476C;
+        //fw_ver    = 0xB98C;
+        off_idps  = 0x80000000003E2E30ULL;
+        off_idps2 = 0x8000000000474AF4ULL;
+        off_psid  = off_idps2 + 0x18ULL;
+        payload_mode = is_payload_loaded_475();
+    }
+    else if(is_firm_476dex())
+    {
+        firmware  = 0x476D;
+        //fw_ver    = 0xB98C;
+        off_idps  = 0x8000000000409930ULL;
+        off_idps2 = 0x800000000049CAF4ULL;
+        off_psid  = off_idps2 + 0x18ULL;
+        payload_mode = is_payload_loaded_475dex();
+    }
+    else if(is_firm_478deh())
+    {
+        firmware  = 0x478E;
+        //fw_ver    = 0xB98C;
+        off_idps  = 0x80000000004326B0ULL;
+        off_idps2 = 0x80000000004C4AF4ULL;
+        off_psid  = off_idps2 + 0x18ULL;
+        payload_mode = is_payload_loaded_478deh();
     }
 
     if(is_cobra_based()) use_cobra = true;
@@ -3719,7 +3896,7 @@ s32 main(s32 argc, const char* argv[])
                         DrawDialogOK("Error Loading Payload: map failed?!");
                         exit(0);
                     }
-                    //patch_lv2_protection_355deh(); /* yaw */
+                    patch_lv2_protection_355deh(); /* yaw */
 
                     remove_new_poke_355deh(); /* restore pokes */
                     unmap_lv1_355deh();  /* 3.55 need unmap? */
@@ -4063,12 +4240,12 @@ s32 main(s32 argc, const char* argv[])
                     break;
             }
             break;
-		case 0x460E:
-            set_bdvdemu_460deh(payload_mode);
+        case 0x460E:
+            set_bdvdemu_460dex(payload_mode);
             switch(payload_mode)
             {
                 case ZERO_PAYLOAD: //no payload installed
-                    load_payload_460deh(payload_mode);
+                    load_payload_460dex(payload_mode);
                     __asm__("sync");
                     sleep(1); /* maybe need it, maybe not */
 
@@ -4081,7 +4258,6 @@ s32 main(s32 argc, const char* argv[])
                     break;
             }
             break;
-
         case 0x465C:
         case 0x466C:
             set_bdvdemu_465(payload_mode);
@@ -4157,7 +4333,7 @@ s32 main(s32 argc, const char* argv[])
             }
             break;
         case 0x475C:
-		case 0x476C:
+        case 0x476C:
             set_bdvdemu_475(payload_mode);
             switch(payload_mode)
             {
@@ -4176,11 +4352,30 @@ s32 main(s32 argc, const char* argv[])
             }
             break;
         case 0x475D:
+        case 0x476D:
             set_bdvdemu_475dex(payload_mode);
             switch(payload_mode)
             {
                 case ZERO_PAYLOAD: //no payload installed
                     load_payload_475dex(payload_mode);
+                    __asm__("sync");
+                    sleep(1); /* maybe need it, maybe not */
+
+                    if(!use_cobra && install_mamba)
+                    {
+                        use_mamba = load_ps3_mamba_payload();
+                    }
+                    break;
+                case SKY10_PAYLOAD:
+                    break;
+            }
+            break;
+        case 0x478E:
+            set_bdvdemu_478deh(payload_mode);
+            switch(payload_mode)
+            {
+                case ZERO_PAYLOAD: //no payload installed
+                    load_payload_478deh(payload_mode);
                     __asm__("sync");
                     sleep(1); /* maybe need it, maybe not */
 
@@ -4214,33 +4409,33 @@ s32 main(s32 argc, const char* argv[])
             if(payload_mode == ZERO_PAYLOAD)
             {
                 if(firmware== 0x341C)
-                    sprintf(payload_str, "payload-hermes - new syscall8 v%i (libfs_patched %s)", test & 0xff, is_libfs_patched()? "found!": "not found");
+                        sprintf(payload_str, "payload-hermes - new syscall8 v%i (%slibfs_patched)", test & 0xff, is_libfs_patched()? "": "no ");
                 else
                 {
                     if(use_mamba)
-                        sprintf(payload_str, "payload-sk1e - 'Mamba' syscall8 v%i (libfs_patched %s)", test & 0xff, is_libfs_patched()? "found!": "not found");
+                        sprintf(payload_str, "payload-sk1e - 'Mamba' syscall8 v%i (%slibfs_patched)", test & 0xff, is_libfs_patched()? "": "no ");
                     else if(use_cobra)
-                        sprintf(payload_str, "payload-sk1e - 'Cobra' syscall8 v%i (libfs_patched %s)", test & 0xff, is_libfs_patched()? "found!": "not found");
+                        sprintf(payload_str, "payload-sk1e - 'Cobra' syscall8 v%i (%slibfs_patched)", test & 0xff, is_libfs_patched()? "": "no ");
                     else
-                        sprintf(payload_str, "payload-sk1e - new syscall8 v%i (libfs_patched %s)", test & 0xff, is_libfs_patched()? "found!": "not found");
+                        sprintf(payload_str, "payload-sk1e - new syscall%i v%i (%slibfs_patched)", (u16)SYSCALL_SK1E, test & 0xff, is_libfs_patched()? "": "no ");
                 }
             }
             else if (payload_mode == SKY10_PAYLOAD)
             {
                 if(use_cobra && sys8_mamba() == 0x666)
-                    sprintf(payload_str, "payload-sk1e - 'Mamba' syscall8 v%i (libfs_patched %s)", test & 0xff, is_libfs_patched()? "found!": "not found");
+                    sprintf(payload_str, "payload-sk1e - 'Mamba' syscall8 v%i (%slibfs_patched)", test & 0xff, is_libfs_patched()? "": "no ");
                 else if(use_cobra)
-                    sprintf(payload_str, "payload-sk1e - 'Cobra' syscall8 v%i (libfs_patched %s)", test & 0xff, is_libfs_patched()? "found!": "not found");
+                    sprintf(payload_str, "payload-sk1e - 'Cobra' syscall8 v%i (%slibfs_patched)", test & 0xff, is_libfs_patched()? "": "no ");
                 else
-                    sprintf(payload_str, "payload-sk1e - new syscall8 v%i (libfs_patched %s)", test & 0xff, is_libfs_patched()? "found!": "not found");
+                    sprintf(payload_str, "payload-sk1e - new syscall%i v%i (%slibfs_patched)", (u16)SYSCALL_SK1E, test & 0xff, is_libfs_patched()? "": "no ");
             }
             else
-                sprintf(payload_str, "payload-hermes resident - new syscall8 v%i (libfs_patched %s)", test & 0xff, is_libfs_patched()? "found!": "not found");
+                    sprintf(payload_str, "payload-hermes resident - new syscall%i v%i (%slibfs_patched)", (u16)SYSCALL_SK1E, test & 0xff, is_libfs_patched()? "": "no ");
 
         }
         else
         {       sys8_disable_all = 1;
-                sprintf(payload_str, "payload-sk10 - new syscall8 Err?! v(%i)", test);
+                sprintf(payload_str, "payload-sk1e - new syscall%i Err?! v(%i)", (u16)SYSCALL_SK1E, test);
         }
     }
 
@@ -4252,8 +4447,8 @@ s32 main(s32 argc, const char* argv[])
 
     if(sys8_disable_all != 0 && !unsupported_cfw)
     {
-         if(DrawDialogYesNo2("Syscall 8 very old or not detected\n\nDo you want to REBOOT the PS3?\n\n(Select NO to exit to XMB)") == YES)
-             {
+         if(DrawDialogYesNo2("Syscall is very old or not detected\n\nDo you want to REBOOT the PS3?\n\n(Select NO to exit to XMB)") == YES)
+         {
              set_install_pkg = true;
              game_cfg.direct_boot = 0;
              fun_exit(0);
@@ -4303,6 +4498,22 @@ s32 main(s32 argc, const char* argv[])
         DrawDialogOK(temp_buffer);
     }
 
+    if(use_cobra || use_mamba)
+    {
+        do_umount_iso();
+        wm_sys_storage_ext_umount_discfile();
+        cobra_unset_psp_umd();
+
+        sys_map_path((char*)"/dev_bdvd", NULL);
+        sys_map_path((char*)"/app_home", NULL);
+        sys_map_path((char*)"//dev_bdvd", NULL);
+
+        // Unmount game through webMAN
+        if(get_net_status() == SUCCESS) download_file("http://localhost/mount.ps3/unmount", NULL, 0, NULL);
+    }
+
+    show_http_errors = true;
+
     // spoof firmware
     if(use_cobra && !use_mamba)
     {
@@ -4314,7 +4525,7 @@ s32 main(s32 argc, const char* argv[])
         cobra_config->spoof_version  = 0;
         cobra_config->spoof_revision = 0;
 
-        if(bSpoofVersion && (firmware == 0x446C || firmware == 0x453C || firmware == 0x453D || firmware == 0x455C))
+        if(bSpoofVersion && (firmware == 0x446C || firmware == 0x453C || firmware == 0x453D || firmware == 0x455C || firmware == 0x460C))
         {
             cobra_config->spoof_version  = spoof_version;
             cobra_config->spoof_revision = spoof_revision;
@@ -4367,6 +4578,12 @@ s32 main(s32 argc, const char* argv[])
         sysLv2FsLink("/dev_hdd0/game/BLES80608/USRDIR/sys/SHOWTIME.SELF", tmp_path);
     }
 
+    // auto upgrade
+    if(strstr(self_path, "/dev_hdd0/game/IRISMAN00")==NULL && strstr(self_path, "/dev_hdd0/game/BLES80610")==NULL)
+    {
+        sprintf(tmp_path, "%s/USRDIR/RELOAD.SELF", self_path);
+        sysLv2FsLink("/dev_hdd0/game/IRISMAN00/USRDIR/RELOAD.SELF", tmp_path);
+    }
 #endif
 
     // initialize manager conf
@@ -4638,13 +4855,13 @@ s32 main(s32 argc, const char* argv[])
         else if(strncmp(directories[currentgamedir].path_name, "/ext", 4))
             directories[currentgamedir].flags = D_FLAG_NTFS;
 
-        if(strstr(directories[currentgamedir].path_name, "/PS3ISO/"))
+        if(strstr(directories[currentgamedir].path_name, "/PS3ISO"))
             directories[currentgamedir].flags |= PS3_FLAG;
-        if(strstr(directories[currentgamedir].path_name, "/PSXISO/"))
+        if(strstr(directories[currentgamedir].path_name, "/PSXISO"))
             directories[currentgamedir].flags |= PS1_FLAG;
-        if(strstr(directories[currentgamedir].path_name, "/PS2ISO/"))
+        if(strstr(directories[currentgamedir].path_name, "/PS2ISO"))
             directories[currentgamedir].flags |= PS2_FLAG;
-        if(strstr(directories[currentgamedir].path_name, "/PSPISO/"))
+        if(strstr(directories[currentgamedir].path_name, "/PSPISO"))
             directories[currentgamedir].flags |= PSP_FLAG;
 
         if(flag >= 0) move_bdemubackup_to_origin(flag);
@@ -4722,6 +4939,10 @@ s32 main(s32 argc, const char* argv[])
 
             // Replace ISO with Shadow Copy
             sprintf(psxiso_path, "/dev_hdd0/PSXISO/%s", (char *) get_filename(directories[autolaunch].path_name));
+            if (file_exists(psxiso_path)==false)
+            {
+                sprintf(psxiso_path, "/dev_hdd0/PSXISO [auto]/%s", (char *) get_filename(directories[autolaunch].path_name));
+            }
             if (file_exists(psxiso_path))
             {
                 CopyFile(psxiso_path, directories[autolaunch].path_name);
@@ -4765,7 +4986,7 @@ s32 main(s32 argc, const char* argv[])
             if (!((new_pad | old_pad) & BUTTON_SELECT))
 
             {
-                if (strstr(directories[autolaunch].path_name, "/PSXISO/") != NULL)
+                if (strstr(directories[autolaunch].path_name, "/PSXISO") != NULL)
                     launch_iso_game(directories[autolaunch].path_name, EMU_PSX);
                 else
                 {
@@ -5167,17 +5388,17 @@ skip_bdvd:
                         parse_mygames_xml();
 
                     if(mode_homebrew)
-                        strcpy(filename, "/dev_hdd0/game");
+                        sprintf(filename, "/dev_hdd0/game");
                     else if (!memcmp(hdd_folder, "dev_hdd0", 9))
                         sprintf(filename, "/%s/" __MKDEF_GAMES_DIR, hdd_folder);
                     else if (!memcmp(hdd_folder, "GAMES", 6) || !memcmp(hdd_folder, "dev_hdd0_2", 11))
-                        strcpy(filename, "/dev_hdd0/GAMES");
+                        sprintf(filename, "/dev_hdd0/GAMES");
                     else if (!memcmp(hdd_folder, "host_root", 10))
-                        strcpy(filename, "/host_root");
+                        sprintf(filename, "/host_root");
                     else if (!memcmp(hdd_folder, "video", 6))
-                        strcpy(filename, "/dev_hdd0/video");
+                        sprintf(filename, "/dev_hdd0/video");
                     else if (strstr(hdd_folder, "/"))
-                        strcpy(filename, hdd_folder);
+                        sprintf(filename, hdd_folder);
                     else
                         sprintf(filename, "/dev_hdd0/game/%s/" __MKDEF_GAMES_DIR, hdd_folder);
 
@@ -5222,7 +5443,8 @@ skip_bdvd:
                     strncpy(file, filename, 0x420);
                     n = 1; while(file[n] != '/' && file[n] != 0) n++;
 
-                    fill_directory_entries_with_alt_path(file, n, "/BDISO", "/DVDISO", directories, &ndirectories, D_FLAG_HOMEB | D_FLAG_HOMEB_BD | (1<<find_device));
+                    fill_directory_entries_with_alt_path(file, n, "/BDISO" , "/BDISO [auto]" , directories, &ndirectories, D_FLAG_HOMEB | D_FLAG_HOMEB_BD | (1<<find_device));
+                    fill_directory_entries_with_alt_path(file, n, "/DVDISO", "/DVDISO [auto]", directories, &ndirectories, D_FLAG_HOMEB | D_FLAG_HOMEB_BD | (1<<find_device));
                     fill_directory_entries_with_alt_path(file, n, "/VIDEO", "/MOVIES", directories, &ndirectories, D_FLAG_HOMEB | D_FLAG_HOMEB_BD | (1<<find_device));
 
                     fill_directory_entries_with_alt_path(file, n, "/game/RXMOV", "/game/RXMOV", directories, &ndirectories, D_FLAG_HOMEB | D_FLAG_HOMEB_BD | (1<<find_device));
@@ -5243,6 +5465,21 @@ skip_bdvd:
                         //append gamez, games_dup, games_bad
                         if((mode_homebrew == GAMEBASE_MODE) || (mode_homebrew && find_device != 0))
                         {
+                            if(find_device == 0)
+                            {
+                                sprintf(filename, "/dev_hdd0/GAMES [auto]");
+                                fill_entries_from_device(filename, directories, &ndirectories, flag, mode_homebrew, true);
+
+                                sprintf(filename, "/dev_hdd0/GAMEZ [auto]");
+                                fill_entries_from_device(filename, directories, &ndirectories, flag, mode_homebrew, true);
+                            }
+
+                            sprintf(filename, "/dev_usb00%c/GAMES [auto]", 47 + find_device);
+                            fill_entries_from_device(filename, directories, &ndirectories, flag, mode_homebrew, true);
+
+                            sprintf(filename, "/dev_usb00%c/GAMEZ [auto]", 47 + find_device);
+                            fill_entries_from_device(filename, directories, &ndirectories, flag, mode_homebrew, true);
+
                             sprintf(filename, "/dev_usb00%c/GAMEZ", 47 + find_device);
                             if (fill_entries_from_device(filename, directories, &ndirectories, flag, mode_homebrew, true) == SUCCESS)
                             {
@@ -5254,7 +5491,6 @@ skip_bdvd:
                                 }
                             }
                         }
-
                     }
 
                     if(ndirectories > nd) found_game_insert = true;
@@ -5334,6 +5570,9 @@ skip_bdvd:
                                         {
                                             sprintf(filename, "/%s:/PS3ISO", (mounts[find_device]+k)->name);
                                             fill_iso_entries_from_device(filename, NTFS_FLAG, directories, &ndirectories, (mounts[find_device]+k)->interface->ioType);
+
+                                            sprintf(filename, "/%s:/PS3ISO [auto]", (mounts[find_device]+k)->name);
+                                            fill_iso_entries_from_device(filename, NTFS_FLAG, directories, &ndirectories, (mounts[find_device]+k)->interface->ioType);
                                         }
 
                                         if(mode_homebrew == GAMEBASE_MODE  && (game_list_category == GAME_LIST_RETRO || game_list_category == GAME_LIST_ALL))
@@ -5341,6 +5580,9 @@ skip_bdvd:
                                             if(retro_mode == RETRO_ALL || retro_mode == RETRO_PSX || retro_mode == RETRO_PSALL)
                                             {
                                                 sprintf(filename, "/%s:/PSXISO", (mounts[find_device]+k)->name);
+                                                fill_iso_entries_from_device(filename, PS1_FLAG | D_FLAG_NTFS, directories, &ndirectories, (mounts[find_device]+k)->interface->ioType);
+
+                                                sprintf(filename, "/%s:/PSXISO [auto]", (mounts[find_device]+k)->name);
                                                 fill_iso_entries_from_device(filename, PS1_FLAG | D_FLAG_NTFS, directories, &ndirectories, (mounts[find_device]+k)->interface->ioType);
 
                                                 sprintf(filename, "/%s:/PSXGAMES", (mounts[find_device]+k)->name);
@@ -5451,6 +5693,36 @@ skip_bdvd:
                                                     fill_directory_entries_with_alt_path(filename, n, retro_wswan_path, "/ROMS/wsw", directories, &ndirectories, RETRO_FLAG | D_FLAG_NTFS);
                                                 }
 
+                                                sprintf(cfg_path, "%s/USRDIR/cores/a7800-retroarch.cfg", self_path);
+                                                if(roms_count < max_roms && (retro_mode == RETRO_ALL || retro_mode == RETRO_A7800) && file_exists(cfg_path))
+                                                {
+                                                    fill_directory_entries_with_alt_path(filename, n, retro_a7800_path, "/ROMS/a7800", directories, &ndirectories, RETRO_FLAG | D_FLAG_NTFS);
+                                                }
+
+                                                sprintf(cfg_path, "%s/USRDIR/cores/lynx-retroarch.cfg", self_path);
+                                                if(roms_count < max_roms && (retro_mode == RETRO_ALL || retro_mode == RETRO_LYNX) && file_exists(cfg_path))
+                                                {
+                                                    fill_directory_entries_with_alt_path(filename, n, retro_lynx_path, "/ROMS/lynx", directories, &ndirectories, RETRO_FLAG | D_FLAG_NTFS);
+                                                }
+
+                                                sprintf(cfg_path, "%s/USRDIR/cores/gw-retroarch.cfg", self_path);
+                                                if(roms_count < max_roms && (retro_mode == RETRO_ALL || retro_mode == RETRO_GW) && file_exists(cfg_path))
+                                                {
+                                                    fill_directory_entries_with_alt_path(filename, n, retro_gw_path, "/ROMS/gw", directories, &ndirectories, RETRO_FLAG | D_FLAG_NTFS);
+                                                }
+
+                                                sprintf(cfg_path, "%s/USRDIR/cores/vectrex-retroarch.cfg", self_path);
+                                                if(roms_count < max_roms && (retro_mode == RETRO_ALL || retro_mode == RETRO_VECTX) && file_exists(cfg_path))
+                                                {
+                                                    fill_directory_entries_with_alt_path(filename, n, retro_vectrex_path, "/ROMS/vectrex", directories, &ndirectories, RETRO_FLAG | D_FLAG_NTFS);
+                                                }
+
+                                                sprintf(cfg_path, "%s/USRDIR/cores/2048-retroarch.cfg", self_path);
+                                                if(roms_count < max_roms && (retro_mode == RETRO_ALL || retro_mode == RETRO_2048) && file_exists(cfg_path))
+                                                {
+                                                    fill_directory_entries_with_alt_path(filename, n, retro_2048_path, "/ROMS/2048", directories, &ndirectories, RETRO_FLAG | D_FLAG_NTFS);
+                                                }
+
                                                 if(roms_count) roms_count = max_roms;
                                             }
                                         }
@@ -5460,7 +5732,13 @@ skip_bdvd:
                                         sprintf(filename, "/%s:/BDISO", (mounts[find_device]+k)->name);
                                         fill_iso_entries_from_device(filename, D_FLAG_HOMEB | D_FLAG_HOMEB_BD | D_FLAG_NTFS, directories, &ndirectories, (mounts[find_device]+k)->interface->ioType);
 
+                                        sprintf(filename, "/%s:/BDISO [auto]", (mounts[find_device]+k)->name);
+                                        fill_iso_entries_from_device(filename, D_FLAG_HOMEB | D_FLAG_HOMEB_BD | D_FLAG_NTFS, directories, &ndirectories, (mounts[find_device]+k)->interface->ioType);
+
                                         sprintf(filename, "/%s:/DVDISO", (mounts[find_device]+k)->name);
+                                        fill_iso_entries_from_device(filename, D_FLAG_HOMEB | D_FLAG_HOMEB_DVD | D_FLAG_NTFS, directories, &ndirectories, (mounts[find_device]+k)->interface->ioType);
+
+                                        sprintf(filename, "/%s:/DVDISO [auto]", (mounts[find_device]+k)->name);
                                         fill_iso_entries_from_device(filename, D_FLAG_HOMEB | D_FLAG_HOMEB_DVD | D_FLAG_NTFS, directories, &ndirectories, (mounts[find_device]+k)->interface->ioType);
 
                                         sprintf(filename, "/%s:/VIDEO", (mounts[find_device]+k)->name);
@@ -5643,6 +5921,8 @@ skip_refresh:
             update_twat(true);
         }
 
+        if(do_once && frame_count>33) {do_once = false; get_games();}
+
         switch(menu_screen)
         {
             case SCR_MAIN_GAME_LIST:
@@ -5694,6 +5974,8 @@ skip_refresh:
         }
 
         auto_ftp(); // auto enable the ftp
+
+        test_audio_file(false);
     }
 
 #endif
@@ -5877,6 +6159,8 @@ void load_gamecfg(int current_dir)
             free(file);
         }
     }
+
+    if(game_cfg.direct_boot > 3) game_cfg.direct_boot = 3;
 }
 
 
@@ -6815,7 +7099,7 @@ void draw_grid(float x, float y)
         }
         else
         {
-            if((game_cfg.useBDVD) || (game_cfg.direct_boot == 2) || (directories[get_currentdir(i)].flags  & GAMELIST_FILTER) == NTFS_FLAG)
+            if((game_cfg.useBDVD) || (game_cfg.direct_boot == 2) || (game_cfg.direct_boot == 3) || (directories[get_currentdir(i)].flags  & GAMELIST_FILTER) == NTFS_FLAG)
             {
                 tiny3d_SetTextureWrap(0, Png_res_offset[IMG_BLURAY_DISC], Png_res[IMG_BLURAY_DISC].width,
                                       Png_res[IMG_BLURAY_DISC].height, Png_res[IMG_BLURAY_DISC].wpitch,
@@ -7582,7 +7866,7 @@ void draw_coverflow(float x, float y)
         }
         else
         {
-            if((directories[get_currentdir(i)].flags & PS1_FLAG) || (directories[get_currentdir(i)].flags & D_FLAG_PS3_ISO) || (game_cfg.useBDVD) || (game_cfg.direct_boot == 2))
+            if((directories[get_currentdir(i)].flags & PS1_FLAG) || (directories[get_currentdir(i)].flags & D_FLAG_PS3_ISO) || (game_cfg.useBDVD) || (game_cfg.direct_boot == 2) || (game_cfg.direct_boot == 3))
             {
                 // add PSP / PS2 / PSX ISO icon
                 if((directories[get_currentdir(i)].flags & (PSP_FLAG | RETRO_FLAG | PS2_CLASSIC_FLAG)) == (PSP_FLAG | RETRO_FLAG | PS2_CLASSIC_FLAG))
@@ -7756,6 +8040,8 @@ int gui_control()
         if(mode_favourites >= 0x10000) mode_favourites = 1;
         else
         {
+            unlink_secure("/dev_hdd0/tmp/wm_request");
+
             if(!test_ftp_working())
             {
                 if(old_pad & BUTTON_L2)
@@ -7899,16 +8185,16 @@ autolaunch_proc:
                     sprintf(tmp_path, "%s/PS3_GAME/ICON0.PNG", directories[currentgamedir].path_name);
                     if(file_exists(tmp_path))
                         CopyFile(tmp_path, LASTGAME_PATH_SS "ICON0.PNG");
-                    else if(strstr(directories[currentgamedir].path_name, "/PSXISO/"))
+                    else if(strstr(directories[currentgamedir].path_name, "/PSXISO"))
                         CopyFile(LASTGAME_PATH_SS "USRDIR/PS1.PNG", LASTGAME_PATH_SS "ICON0.PNG");
-                    else if(strstr(directories[currentgamedir].path_name, "/PS2ISO/"))
+                    else if(strstr(directories[currentgamedir].path_name, "/PS2ISO"))
                         CopyFile(LASTGAME_PATH_SS "USRDIR/PS2.PNG", LASTGAME_PATH_SS "ICON0.PNG");
-                    else if(strstr(directories[currentgamedir].path_name, "/PSPISO/"))
+                    else if(strstr(directories[currentgamedir].path_name, "/PSPISO"))
                         CopyFile(LASTGAME_PATH_SS "USRDIR/PSP.PNG", LASTGAME_PATH_SS "ICON0.PNG");
                     else
                         CopyFile(LASTGAME_PATH_SS "USRDIR/ORG.PNG", LASTGAME_PATH_SS "ICON0.PNG");
 
-                    if(strstr(directories[currentgamedir].path_name, "/PS3ISO/"))
+                    if(strstr(directories[currentgamedir].path_name, "/PS3ISO"))
                     {
                         if(file_exists(directories[currentgamedir].path_name) && strcasestr(directories[currentgamedir].path_name, ".iso"))
                         {
@@ -7920,7 +8206,7 @@ autolaunch_proc:
                             ExtractFileFromISO(directories[currentgamedir].path_name, "/PS3_GAME/PIC2.PNG;1" , LASTGAME_PATH_SS "PIC2.PNG");
                         }
                     }
-                    else if(strstr(directories[currentgamedir].path_name, "/PSPISO/"))
+                    else if(strstr(directories[currentgamedir].path_name, "/PSPISO"))
                     {
                         if(file_exists(directories[currentgamedir].path_name) && strcasestr(directories[currentgamedir].path_name, ".iso"))
                         {
@@ -8003,16 +8289,16 @@ autolaunch_proc:
                     sprintf(tmp_path, "%s/PS3_GAME/ICON0.PNG", directories[currentgamedir].path_name);
                     if(file_exists(tmp_path))
                         CopyFile(tmp_path, LASTGAME_PATH "ICON0.PNG");
-                    else if(strstr(directories[currentgamedir].path_name, "/PSXISO/"))
+                    else if(strstr(directories[currentgamedir].path_name, "/PSXISO"))
                         CopyFile(LASTGAME_PATH "USRDIR/PS1.PNG", LASTGAME_PATH "ICON0.PNG");
-                    else if(strstr(directories[currentgamedir].path_name, "/PS2ISO/"))
+                    else if(strstr(directories[currentgamedir].path_name, "/PS2ISO"))
                         CopyFile(LASTGAME_PATH "USRDIR/PS2.PNG", LASTGAME_PATH "ICON0.PNG");
-                    else if(strstr(directories[currentgamedir].path_name, "/PSPISO/"))
+                    else if(strstr(directories[currentgamedir].path_name, "/PSPISO"))
                         CopyFile(LASTGAME_PATH "USRDIR/PSP.PNG", LASTGAME_PATH "ICON0.PNG");
                     else
                         CopyFile(LASTGAME_PATH "USRDIR/ORG.PNG", LASTGAME_PATH "ICON0.PNG");
 
-                    if(strstr(directories[currentgamedir].path_name, "/PS3ISO/"))
+                    if(strstr(directories[currentgamedir].path_name, "/PS3ISO"))
                     {
                         if(file_exists(directories[currentgamedir].path_name) && strcasestr(directories[currentgamedir].path_name, ".iso"))
                         {
@@ -8024,7 +8310,7 @@ autolaunch_proc:
                             ExtractFileFromISO(directories[currentgamedir].path_name, "/PS3_GAME/PIC2.PNG;1" , LASTGAME_PATH "PIC2.PNG");
                         }
                     }
-                    else if(strstr(directories[currentgamedir].path_name, "/PSPISO/"))
+                    else if(strstr(directories[currentgamedir].path_name, "/PSPISO"))
                     {
                         if(file_exists(directories[currentgamedir].path_name) && strcasestr(directories[currentgamedir].path_name, ".iso"))
                         {
@@ -8152,11 +8438,16 @@ autolaunch_proc:
                     return r;
                 }
 
+                if((use_cobra || use_mamba) && strstr(directories[currentgamedir].path_name, "/dev_usb")!=NULL) reset_usb_ports(directories[currentgamedir].path_name);
+
+                if((directories[currentgamedir].flags & (PSP_FLAG | RETRO_FLAG | PS2_CLASSIC_FLAG)) == (PSP_FLAG | RETRO_FLAG | PS2_CLASSIC_FLAG) || (directories[currentgamedir].flags & D_FLAG_HOMEB)) ;
+                else if((game_cfg.direct_boot == 3) || manager_cfg.global_wm_autoplay || strstr(directories[currentgamedir].path_name, "[auto]")!=NULL) {game_cfg.direct_boot = 0; SaveFile((char*)"/dev_hdd0/tmp/wm_request", (char*)"GET /play.ps3\n", 14);}
+
                 if((directories[currentgamedir].flags & (BDVD_FLAG | HOMEBREW_FLAG | PS1_FLAG)) == PS1_FLAG)
                 {
                     if(!(directories[currentgamedir].flags & PS3_FLAG))
                     {
-                        if (strstr(directories[currentgamedir].path_name, "/PSXISO/") != NULL)
+                        if (strstr(directories[currentgamedir].path_name, "/PSXISO") != NULL)
                             launch_iso_game(directories[currentgamedir].path_name, 0);
                         else
                         {
@@ -8365,7 +8656,6 @@ autolaunch_proc:
                 // Fix PS3_EXTRA flag in PARAM.SFO
                 fix_PS3_EXTRA_attribute(directories[currentgamedir].path_name);
 
-
                 if(!game_cfg.ext_ebootbin)
                     sys8_path_table(0LL);
                 else
@@ -8389,6 +8679,15 @@ autolaunch_proc:
                         fclose(fp);
                         add_sys8_path_table("/dev_bdvd/PS3_GAME/USRDIR/EBOOT.BIN", tmp_path);
                     }
+                }
+
+
+                sprintf(tmp_path, "%s/PS3_GAME", directories[currentgamedir].path_name);
+                if((use_cobra || use_mamba) && (!(global_bd_mirror | game_cfg.bdemu | game_cfg.bdemu_ext)) && file_exists(tmp_path))
+                {   // mount ps3 game as /dev_bdvd & /app_home
+                    sys8_disable(0ULL);
+                    wm_cobra_map_game((char*)directories[currentgamedir].path_name, (char*)directories[currentgamedir].title_id);
+                    goto exit_mount;
                 }
 
                 load_from_bluray = game_cfg.useBDVD;
@@ -8732,9 +9031,10 @@ autolaunch_proc:
 
                 build_sys8_path_table();
 
+    exit_mount:
                 exit_program = true;
 
-                if(game_cfg.direct_boot) game_cfg.direct_boot = 555;
+                if(game_cfg.direct_boot==1 || game_cfg.direct_boot==2) game_cfg.direct_boot = 555;
 
                 set_device_wakeup_mode(bdvd_is_usb ? 0xFFFFFFFF : directories[currentgamedir].flags);
                 skip_sys8:
@@ -8846,7 +9146,7 @@ autolaunch_proc:
             if(strncmp(directories[indx].title_id, NETHOST, 9) == SUCCESS)
             {
                 sprintf(temp_buffer, (strncmp(directories[indx].path_name, "net", 3) ? "%s\n\nPath:\n%s" : "%s\n\nNetwork Path:\n%s"),
-                                                                                       directories[indx].title, directories[indx].path_name);
+                                                                                       directories[indx].title, str_replace(directories[indx].path_name, "%20", " "));
                 DrawDialogOKTimer(temp_buffer, 5000.0f);
                 return r;
             }
@@ -11445,6 +11745,10 @@ void draw_configs(float x, float y, int index)
     x2 = DrawButton2_UTF8(x2, y2, 0, language[DRAWGMCFG_NO] , (game_cfg.direct_boot == 0)) + 8;
     x2 = DrawButton2_UTF8(x2, y2, 0, language[DRAWGMCFG_YES], (game_cfg.direct_boot == 1)) + 8;
     x2 = DrawButton2_UTF8(x2, y2, 0, "With BR"              , (game_cfg.direct_boot == 2)) + 8;
+    if(manager_cfg.global_wm_autoplay)
+        x2 = DrawButton2_UTF8(x2, y2, 0, "Global Auto-Play [wMM]", true) + 8;
+    else
+        x2 = DrawButton2_UTF8(x2, y2, 0, "Auto-Play [wMM]"  , (game_cfg.direct_boot == 3)) + 8;
 
     y2 += 48;
 
@@ -11570,7 +11874,10 @@ void draw_configs(float x, float y, int index)
                 ROT_INC(game_cfg.useBDVD, 1, 0);
                 break;
             case 1:
-                ROT_INC(game_cfg.direct_boot, 2, 0);
+                if(game_cfg.direct_boot == 3 && (new_pad & BUTTON_CROSS_))
+                    manager_cfg.global_wm_autoplay ^= 1;
+                else
+                    ROT_INC(game_cfg.direct_boot, 3, 0);
                 break;
             case 2:
                 if(payload_mode >= ZERO_PAYLOAD)
@@ -11637,7 +11944,7 @@ void draw_configs(float x, float y, int index)
                 ROT_DEC(game_cfg.useBDVD, 0, 1);
                 break;
             case 1:
-                ROT_DEC(game_cfg.direct_boot, 0, 2);
+                ROT_DEC(game_cfg.direct_boot, 0, 3);
                 break;
             case 2:
                 if(payload_mode >= ZERO_PAYLOAD)
@@ -11673,7 +11980,7 @@ void draw_configs(float x, float y, int index)
                 ROT_INC(game_cfg.useBDVD, 1, 0);
                 break;
             case 1:
-                ROT_INC(game_cfg.direct_boot, 2, 0);
+                ROT_INC(game_cfg.direct_boot, 3, 0);
                 break;
             case 2:
                 if(payload_mode >= ZERO_PAYLOAD)
@@ -11716,7 +12023,7 @@ void draw_gbloptions(float x, float y)
 
     DrawFormatString(x, y, " %s", language[DRAWGLOPT_OPTS]);
 
-    DrawFormatString(710 - x, y, ((manager_cfg.opt_flags & OPTFLAGS_PLAYMUSIC) && (song_selected >= 0)) ? "Song: music%i.mod" : "", song_selected + 1);
+    DrawFormatString(710 - x, y, ((manager_cfg.opt_flags & OPTFLAGS_PLAYMUSIC) && (song_selected >= 0)) ? "Song: music%i" : "", song_selected + 1);
 
     y += 24;
 
@@ -11781,7 +12088,7 @@ void draw_gbloptions(float x, float y)
 
     bool bSelected = (flash && (select_option == 6));
 
-    if(!bAllowNetGames &&  !(net_option == 0 || (net_option >= 7 && net_option <= 12))) net_option = 0;
+    if(!bAllowNetGames &&  !(net_option == 0 || (net_option >= 7 && net_option <= 13))) net_option = 0;
 
     if (net_option == 0)
         DrawButton1_UTF8((848 - 520) / 2, y2, 520, (ftp_ip_str[0]) ? ftp_ip_str : language[DRAWGLOPT_INITFTP], bSelected);
@@ -11796,8 +12103,9 @@ void draw_gbloptions(float x, float y)
                                                    (net_option ==  8) ? ((use_cobra && !use_mamba) ? "Disable Cobra" : "Enable Cobra") :
                                                    (net_option ==  9) ? "Showtime" :
                                                    (net_option == 10) ? "Internet Browser" :
-                                                   (net_option == 11) ? language[DRAWSCREEN_SHUTDOWN] :
-                                                   (net_option == 12) ? language[DRAWSCREEN_RESTART]  : "", bSelected);
+                                                   (net_option == 11) ? (file_exists("/dev_blind") ? "/dev_blind : ON" : "/dev_blind : OFF") :
+                                                   (net_option == 12) ? language[DRAWSCREEN_SHUTDOWN] :
+                                                   (net_option == 13) ? language[DRAWSCREEN_RESTART]  : "", bSelected);
 
     y2+= 48;
 
@@ -11865,7 +12173,7 @@ void draw_gbloptions(float x, float y)
                 }
             }
         }
-         else
+        else
             DrawFormatString(0, y2 - 28, "%x%s  -  %s", ((firmware>>4) & 0xFFFF), ((firmware & 0xF) == 0xE ? "DEH": (firmware & 0xF) == 0xD ? "DEX": "CEX"), payload_str);
     }
 
@@ -12096,23 +12404,31 @@ exit_gbloptions:
 
                     if(download_file("http://ps3.aldostools.org/webftp_server.sprx", tmp_path, 0, NULL) == 0)
                     {
-                        // Create boot_plugins.txt if it doesn't exist
-                        if(file_exists("/dev_hdd0/boot_plugins.txt") == false)
-                        {
-                            strcat(tmp_path, "\n");
-
-                            FILE *fp;
-
-                            // write plugin path
-                            fp = fopen("/dev_hdd0/boot_plugins.txt", "w");
-                            fputs (tmp_path, fp);
-                            fclose(fp);
-                        }
-
                         DrawDialogOKTimer("webMAN has been updated successfully!", 2000.0f);
                     }
                     else
                         DrawDialogOKTimer("webMAN could not be downloaded!", 2000.0f);
+
+                    // Create boot_plugins.txt if it doesn't exist
+                    if(file_exists("/dev_hdd0/boot_plugins.txt") == false && file_exists(tmp_path))
+                    {
+                        strcat(tmp_path, "\n");
+
+                        FILE *fp;
+
+                        // write plugin path
+                        fp = fopen("/dev_hdd0/boot_plugins.txt", "w");
+                        fputs (tmp_path, fp);
+
+                        sprintf(tmp_path, "/dev_hdd0/plugins/wm_vsh_menu.sprx");
+                        if(file_exists(tmp_path))
+                        {
+                            strcat(tmp_path, "\n");
+                            fputs (tmp_path, fp);
+                        }
+
+                        fclose(fp);
+                    }
 
                     return_to_game_list(false);
                     return;
@@ -12168,7 +12484,16 @@ exit_gbloptions:
 
                     break;
 
-                  case 11: // Shutdown PS3
+                  case 11: // toggle dev_blind
+
+                    if(file_exists("/dev_blind/sys"))
+                        sys_fs_umount("/dev_blind");
+                    else
+                        sys_fs_mount("CELL_FS_IOS:BUILTIN_FLSH1", "CELL_FS_FAT", "/dev_blind", 0);
+
+                    break;
+
+                  case 12: // Shutdown PS3
                     SaveGameList();
 
                     set_install_pkg = false;
@@ -12177,7 +12502,7 @@ exit_gbloptions:
                     sys_shutdown();
                     break;
 
-                  case 12: // Restart PS3
+                  case 13: // Restart PS3
                   reboot:
                     SaveGameList();
 
@@ -12404,7 +12729,7 @@ exit_gbloptions:
     {
         if(new_pad & (BUTTON_LEFT))
         {
-            ROT_DEC(net_option, 0, 12)
+            ROT_DEC(net_option, 0, 13)
             if(net_option == 8 && file_exists("/dev_flash/sys/stage2.bin") == false
                                && file_exists("/dev_flash/sys/stage2_disabled.bin") == false
                                && file_exists("/dev_flash/rebug/cobra/stage2.cex") == false
@@ -12412,7 +12737,7 @@ exit_gbloptions:
         }
         else if(new_pad & (BUTTON_RIGHT))
         {
-            ROT_INC(net_option, 12, 0)
+            ROT_INC(net_option, 13, 0)
             if(net_option == 8 && file_exists("/dev_flash/sys/stage2.bin") == false
                                && file_exists("/dev_flash/sys/stage2_disabled.bin") == false
                                && file_exists("/dev_flash/rebug/cobra/stage2.cex") == false
@@ -12605,6 +12930,7 @@ void draw_toolsoptions(float x, float y)
             else
             {
                 unlink_secure("/dev_hdd0/tmp/turnoff");
+                unlink_secure("/dev_hdd0/tmp/wm_request");
                 fun_exit();
                 sys_reboot();
             }
@@ -12771,6 +13097,23 @@ void draw_gamelist_options(float x, float y)
      case RETRO_WSWAN:
         DrawButton1_UTF8((848 - 520) / 2, y2, 520, "Retro: WonderSwan", bSelected);
         break;
+
+     case RETRO_A7800:
+        DrawButton1_UTF8((848 - 520) / 2, y2, 520, "Retro: Atari 7800", bSelected);
+        break;
+     case RETRO_LYNX:
+        DrawButton1_UTF8((848 - 520) / 2, y2, 520, "Retro: Atari Lynx", bSelected);
+        break;
+     case RETRO_GW:
+        DrawButton1_UTF8((848 - 520) / 2, y2, 520, "Retro: Game & Watch", bSelected);
+        break;
+     case RETRO_VECTX:
+        DrawButton1_UTF8((848 - 520) / 2, y2, 520, "Retro: Vectrex", bSelected);
+        break;
+     case RETRO_2048:
+        DrawButton1_UTF8((848 - 520) / 2, y2, 520, "Retro: 2048", bSelected);
+        break;
+
      default:
         DrawButton1_UTF8((848 - 520) / 2, y2, 520, "PSX + PS2 + PSP + Retro", bSelected);
         break;
@@ -12882,7 +13225,7 @@ void draw_gamelist_options(float x, float y)
                 if(select_option == max_options || bAllowNetGames == false)
                 {
                     // retro
-                    if(retro_mode > 17) retro_mode = RETRO_ALL;
+                    if(retro_mode > 22) retro_mode = RETRO_ALL;
                 }
                 else
                 {
@@ -13006,12 +13349,12 @@ void draw_gamelist_options(float x, float y)
         if(new_pad & BUTTON_LEFT)
         {
             frame_count = 32;
-            ROT_DEC(retro_mode, 0, 17);
+            ROT_DEC(retro_mode, 0, 22);
         }
         else if(new_pad & BUTTON_RIGHT)
         {
             frame_count = 32;
-            ROT_INC(retro_mode, 17, 0);
+            ROT_INC(retro_mode, 22, 0);
         }
     }
 }
@@ -13498,7 +13841,7 @@ void draw_console_id_tools(float x, float y)
     SetFontSize(18, 20);
     SetFontAutoCenter(1);
 
-     DrawFormatString(0, y2 - 28, "%x%s  -  %s", ((firmware>>4) & 0xFFFF), ((firmware & 0xF) == 0xE ? "DEH": (firmware & 0xF) == 0xD ? "DEX": "CEX"), payload_str);
+    DrawFormatString(0, y2 - 28, "%x%s  -  %s", ((firmware>>4) & 0xFFFF), ((firmware & 0xF) == 0xE ? "DEH": (firmware & 0xF) == 0xD ? "DEX": "CEX"), payload_str);
 
 
     SetFontAutoCenter(0);

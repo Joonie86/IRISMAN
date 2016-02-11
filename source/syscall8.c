@@ -31,8 +31,9 @@ THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 int sys8_disable_all = 0;
 
 #define SYSCALL8_OPCODE_GET_MAMBA           0x7FFFULL
+#define SYSCALL_MAMBA                       8ULL
 
-static uint64_t syscall8(register uint64_t cmd, register uint64_t param1, register  uint64_t param2, register  uint64_t param3)
+static uint64_t syscall_sk1e(register uint64_t cmd, register uint64_t param1, register  uint64_t param2, register  uint64_t param3)
 {
     if(sys8_disable_all) return -1ULL;
 
@@ -42,7 +43,7 @@ static uint64_t syscall8(register uint64_t cmd, register uint64_t param1, regist
                       :"%r0", "%r12", "%lr", "%ctr", "%xer", "%cr0", "%cr1", "%cr5", "%cr6", "%cr7", "memory");
     return cmd;
 #else
-    lv2syscall4(8, cmd, param1, param2, param3);
+    lv2syscall4(SYSCALL_SK1E, cmd, param1, param2, param3);
     return_to_user_prog(uint64_t);
 #endif
 }
@@ -50,76 +51,79 @@ static uint64_t syscall8(register uint64_t cmd, register uint64_t param1, regist
 
 int sys8_mamba(void)
 {
-    return (int) syscall8(SYSCALL8_OPCODE_GET_MAMBA, 0ULL, 0ULL, 0ULL);
+    if(sys8_disable_all) return -1;
+
+    lv2syscall4(SYSCALL_MAMBA, SYSCALL8_OPCODE_GET_MAMBA, 0ULL, 0ULL, 0ULL);
+    return_to_user_prog(uint64_t);
 }
 
 int sys8_disable(uint64_t key)
 {
-    return (int) syscall8(0ULL, key, 0ULL, 0ULL);
+    return (int) syscall_sk1e(0ULL, key, 0ULL, 0ULL);
 }
 
 int sys8_enable(uint64_t key)
 {
-    return (int) syscall8(1ULL, key, 0ULL, 0ULL);
+    return (int) syscall_sk1e(1ULL, key, 0ULL, 0ULL);
 }
 
 uint64_t sys8_memcpy(uint64_t dst, uint64_t src, uint64_t size)
 {
-    return syscall8(2ULL, dst, src, size);
+    return syscall_sk1e(2ULL, dst, src, size);
 }
 
 uint64_t sys8_memcpyinstr(uint64_t dst, uint64_t src, uint64_t size)
 {
-    return syscall8(12ULL, dst, src, size);
+    return syscall_sk1e(12ULL, dst, src, size);
 }
 
 int sys8_pokeinstr(uint64_t addr, uint64_t data)
 {
-    return (int) syscall8(13ULL, addr, data, 0ULL);
+    return (int) syscall_sk1e(13ULL, addr, data, 0ULL);
 }
 
 uint64_t sys8_memset(uint64_t dst, uint64_t val, uint64_t size)
 {
-    return syscall8(3ULL, dst, val, size);
+    return syscall_sk1e(3ULL, dst, val, size);
 }
 
 uint64_t sys8_call(uint64_t addr, uint64_t param1, uint64_t param2)
 {
-    return syscall8(4ULL, addr, param1, param2);
+    return syscall_sk1e(4ULL, addr, param1, param2);
 }
 
 uint64_t sys8_alloc(uint64_t size, uint64_t pool)
 {
-    return syscall8(5ULL, size, pool, 0ULL);
+    return syscall_sk1e(5ULL, size, pool, 0ULL);
 }
 
 uint64_t sys8_free(uint64_t addr, uint64_t pool)
 {
-    return syscall8(6ULL, addr, pool, 0ULL);
+    return syscall_sk1e(6ULL, addr, pool, 0ULL);
 }
 
 void sys8_panic(void)
 {
-    syscall8(7ULL, 0ULL, 0ULL, 0ULL);
+    syscall_sk1e(7ULL, 0ULL, 0ULL, 0ULL);
 }
 
 int sys8_perm_mode(uint64_t mode)
 {
-    return (int) syscall8(8ULL, mode, 0ULL, 0ULL);
+    return (int) syscall_sk1e(8ULL, mode, 0ULL, 0ULL);
 }
 
 int sys8_sys_configure(uint64_t mode)
 {
-    return (int) syscall8(10ULL, mode, 0ULL, 0ULL);
+    return (int) syscall_sk1e(10ULL, mode, 0ULL, 0ULL);
 }
 
 
 int sys8_lv1_syscall(lv1_reg *in, lv1_reg *out)
 {
-    return (int) syscall8(11ULL, (uint64_t) in, (uint64_t) out, 0ULL);
+    return (int) syscall_sk1e(11ULL, (uint64_t) in, (uint64_t) out, 0ULL);
 }
 
 uint64_t sys8_path_table(uint64_t addr_table)
 {
-    return syscall8(9ULL, addr_table, 0ULL, 0ULL);
+    return syscall_sk1e(9ULL, addr_table, 0ULL, 0ULL);
 }

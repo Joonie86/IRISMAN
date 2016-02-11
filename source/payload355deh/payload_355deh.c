@@ -315,15 +315,15 @@ void unmap_lv1_355deh()
 }
 
 u64 lv2poke(u64 addr, u64 value);
-/*
+
 void patch_lv2_protection_355deh()
 {
-	lv2poke(HV_BASE_355DEX + 0x363a78, 0x0000000000000001ULL);
-	lv2poke(HV_BASE_355DEX + 0x363a80, 0xe0d251b556c59f05ULL);
-	lv2poke(HV_BASE_355DEX + 0x363a88, 0xc232fcad552c80d7ULL);
-	lv2poke(HV_BASE_355DEX + 0x363a90, 0x65140cd200000000ULL);
+	lv2poke(HV_BASE_355DEH + 0x363a78, 0x0000000000000001ULL);
+	lv2poke(HV_BASE_355DEH + 0x363a80, 0xe0d251b556c59f05ULL);
+	lv2poke(HV_BASE_355DEH + 0x363a88, 0xc232fcad552c80d7ULL);
+	lv2poke(HV_BASE_355DEH + 0x363a90, 0x65140cd200000000ULL);
 }
-*/
+
 /******************************************************************************************************************************************************/
 /* STORAGE FUNCTIONS                                                                                                                                  */
 /******************************************************************************************************************************************************/
@@ -351,7 +351,7 @@ static int lv2_patch_storage_355deh(void)
     //search bin "5F 6F 66 5F 70 72 6F 64  75 63 74 5F 6D 6F 64 65" to find
     // LV2 enable syscall storage
     save_lv2_storage_patch= peekq(0x8000000000318008ULL);
-    pokeq32(0x8000000000318008ULL, 0x40000000); 
+    pokeq32(0x8000000000318008ULL, 0x40000000);
 
 // LV1 Offsets
     regs_i.reg3 = 0x1773b8; regs_i.reg4 = 0x7f83e37860000000ULL;
@@ -373,7 +373,7 @@ static int lv2_patch_storage_355deh(void)
     regs_i.reg11 = 0xB6;
     sys8_lv1_syscall(&regs_i, &regs_o); save_lv1_storage_patches[3]= regs_o.reg4;
     regs_i.reg11 = 0xB7; sys8_lv1_syscall(&regs_i, &regs_o);
-	
+
 
     is_patched = 1;
 
@@ -388,7 +388,7 @@ static int lv2_unpatch_storage_355deh(void)
 
     //search bin "5F 6F 66 5F 70 72 6F 64  75 63 74 5F 6D 6F 64 65" to find
     // LV2 disable syscall storage
-    pokeq(0x8000000000318008ULL, save_lv2_storage_patch); 
+    pokeq(0x8000000000318008ULL, save_lv2_storage_patch);
 
     regs_i.reg11 = 0xB7;
 // LV1 Offsets

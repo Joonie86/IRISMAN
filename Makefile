@@ -44,30 +44,37 @@ SCETOOL_FLAGS	+=	--self-cap-flags 0000000000000000000000000000000000000000000000
 # SOURCES is a list of directories containing source code
 # INCLUDES is a list of directories containing extra header files
 #---------------------------------------------------------------------------------
-TARGET		:=	$(notdir $(CURDIR))
-BUILD		:=	build
-SOURCES		:=	source source/ftp
-SOURCES		+=  source/payload341    source/payload355    source/payload355dex    source/payload355deh source/payload421 source/payload421dex
-SOURCES		+=  source/payload430    source/payload430dex source/payload431    source/payload440 source/payload441
-SOURCES		+=  source/payload441dex source/payload446    source/payload446dex source/payload450 source/payload450dex
-SOURCES		+=  source/payload453    source/payload453dex source/payload455    source/payload455dex 
-SOURCES		+=  source/payload460    source/payload460dex    source/payload460deh    source/payload465    source/payload465dex source/payload470 source/payload470dex source/payload475 source/payload475dex
+TARGET		:=  $(notdir $(CURDIR))
+BUILD		:=  build
+SOURCES		:=  source source/ftp
+SOURCES		+=  source/payload341  source/payload355     source/payload355dex  source/payload355deh
+SOURCES		+=  source/payload421  source/payload421dex  source/payload430     source/payload430dex
+SOURCES		+=  source/payload431  source/payload440     source/payload441     source/payload441dex
+SOURCES		+=  source/payload446  source/payload446dex  source/payload450     source/payload450dex
+SOURCES		+=  source/payload453  source/payload453dex  source/payload455     source/payload455dex
+SOURCES		+=  source/payload460  source/payload460dex  source/payload460deh
+SOURCES		+=  source/payload465  source/payload465dex
+SOURCES		+=  source/payload470  source/payload470dex  source/payload475     source/payload475dex     source/payload478deh
 
-DATA		:=	datas
-SHADERS		:=	shaders
-INCLUDES	:=	include include/ftp
-INCLUDES	+=  include/payload341    include/payload355    include/payload355dex    include/payload355deh include/payload421 include/payload421dex
-INCLUDES	+=  include/payload430    include/payload430dex include/payload431    include/payload440 include/payload441
-INCLUDES	+=  include/payload441dex include/payload446    include/payload446dex include/payload450 include/payload450dex
-INCLUDES	+=  include/payload453    include/payload453dex include/payload455    include/payload455dex
-INCLUDES	+=  include/payload460    include/payload460dex    include/payload460deh    include/payload465    include/payload465dex include/payload470 include/payload470dex include/payload475 include/payload475dex 
+DATA		:=  datas
+SHADERS		:=  shaders
+INCLUDES	:=  include include/ftp
+INCLUDES	+=  include/payload341  include/payload355     include/payload355dex  include/payload355deh
+INCLUDES	+=  include/payload421  include/payload421dex  include/payload430     include/payload430dex
+INCLUDES	+=  include/payload431  include/payload440     include/payload441     include/payload441dex
+INCLUDES	+=  include/payload446  include/payload446dex  include/payload450     include/payload450dex
+INCLUDES	+=  include/payload453  include/payload453dex  include/payload455     include/payload455dex
+INCLUDES	+=  include/payload460  include/payload460dex  include/payload460deh
+INCLUDES	+=  include/payload465  include/payload465dex
+INCLUDES	+=  include/payload470  include/payload470dex  include/payload475     include/payload475dex     include/payload478deh
 
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
 LIBS		:=	../lib/libcobra.a ../lib/libntfs_ext.a -lfreetype -lz -ltiny3d -lnetctl -lnet -lsysfs -lpngdec -ljpgdec -lsimdmath -lgcm_sys -lio -lsysutil -lrt -llv2 -lsysmodule \
-			-lhttputil -lhttp -lssl -laudioplayer -lmod -lspu_sound -laudio -lm $(PORTLIBS)/modules/spu_soundmodule.bin.a
-
+			-lhttputil -lhttp -lssl -laudioplayer \
+			-lmpg123 -logg \
+			-lmod -lspu_sound -laudio -lm $(PORTLIBS)/modules/spu_soundmodule.bin.a
 
 #---------------------------------------------------------------------------------
 # options for code generation

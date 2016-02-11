@@ -16,7 +16,6 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 3 of the License.
  */
-// Joonie's port 4.75 CEX
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -43,14 +42,15 @@
 
 #define SYSCALL_BASE                    0x8000000000363BE0ULL // 4.75 CEX
 #define NEW_POKE_SYSCALL                813
-#define NEW_POKE_SYSCALL_ADDR           0x80000000002A1480ULL  // Syscall 813 
+#define NEW_POKE_SYSCALL_ADDR           0x80000000002A1480ULL  // Syscall 813
 
 #define PAYLOAD_OFFSET                  0x3d90
 #define PERMS_OFFSET                    0x3560
 
 #define PAYLOAD_UMOUNT_OFFSET           (0x3d90+0x400)
-#define UMOUNT_SYSCALL_OFFSET           (0x29FB98 + 0x8) // SYSCALL (838) + 8 -> peek(SYSCALL_BASE + 838*8) -> peek(0x363B60 + 0x1A30)
-#define LV2MOUNTADDR_475 0x8000000000479FC0ULL // DONE
+#define UMOUNT_SYSCALL_OFFSET           (0x29FB98 + 0x8) // SYSCALL (838) + 8 -> peek(SYSCALL_BASE + 838*8) -> peek(0x363BE0 + 0x1A30)
+
+#define LV2MOUNTADDR_475 0x8000000000479FC0ULL
 //0xff0 => 0x116c (458098 - 459204)
 #define LV2MOUNTADDR_475_ESIZE 0x118
 #define LV2MOUNTADDR_475_CSIZE 0x108
@@ -101,12 +101,12 @@ static inline void _poke32(u64 addr, uint32_t val)
 
 int is_firm_475(void)
 {
-    // TOC 4.75
+   // TOC 4.75 (same as 4.76)
    u64 toc;
    toc =peekq(0x8000000000003000ULL);
    if(toc == 0x800000000034FBB0ULL)
    {
-      return (peekq(0x80000000002FCB68ULL)!=0x323031352F30382FULL); //timestamp: 2015/04
+      return (peekq(0x80000000002FCB68ULL)!=0x323031352F30382FULL); //timestamp: 2015/08
    }
    else
    {
@@ -116,7 +116,7 @@ int is_firm_475(void)
 
 int is_firm_476(void)
 {
-    // TOC 4.76 (same as 4.75)
+   // TOC 4.76 (same as 4.75)
    u64 toc;
    toc =peekq(0x8000000000003000ULL);
    if(toc == 0x800000000034FBB0ULL)
@@ -128,6 +128,7 @@ int is_firm_476(void)
       return 0;
    }
 }
+
 extern u64 syscall_base;
 
 int is_payload_loaded_475(void)
@@ -138,7 +139,7 @@ int is_payload_loaded_475(void)
     if((addr>>32) == 0x534B3145) { // new method to detect the payload
         addr&= 0xffffffff;
         if(addr) {
-            restore_syscall8[0]= SYSCALL_BASE + 64ULL; // (8*8)
+            restore_syscall8[0]= SYSCALL_BASE + (u64) (SYSCALL_SK1E * 8ULL); // (8*8)
             restore_syscall8[1]= peekq(restore_syscall8[0]);
             pokeq(restore_syscall8[0], 0x8000000000000000ULL + (u64) (addr + 0x20));
         }
@@ -146,7 +147,7 @@ int is_payload_loaded_475(void)
         return SKY10_PAYLOAD;
     }
 
-    addr = peekq((SYSCALL_BASE + 36 * 8));
+    addr = peekq((SYSCALL_BASE + SYSCALL_36 * 8));
     addr = peekq(addr);
     if(peekq(addr - 0x20) == 0x534B313000000000ULL) //SK10 HEADER
         return SKY10_PAYLOAD;
@@ -197,6 +198,10 @@ static inline void lv2_memset( u64 dst, const u64 val, size_t sz)
 -- 4.65   NEW_POKE_SYSCALL_ADDR
 001A6F44  F8 21 FF 01 7C 08 02 A6  FB C1 00 F0 FB E1 00 F8
 001A6F54  EB C2 FE 10 7C 7F 1B 78  38 60 03 2D FB A1 00 E8
+
+-- 4.75   NEW_POKE_SYSCALL_ADDR
+002A1480  F8 21 FF 01 7C 08 02 A6  FB C1 00 F0 FB E1 00 F8
+002A1490  EB C2 25 B8 7C 7F 1B 78  38 60 03 2D FB A1 00 E8
 */
 
 static inline void install_lv2_memcpy()
@@ -210,7 +215,7 @@ static inline void install_lv2_memcpy()
     /* This does not work on some PS3s */
         pokeq(NEW_POKE_SYSCALL_ADDR + 0x00, 0x4800000428250000ULL); // Original: 0xF821FF017C0802A6ULL
         pokeq(NEW_POKE_SYSCALL_ADDR + 0x08, 0x4182001438a5ffffULL); // Original: 0xFBC100F0FBE100F8ULL
-        pokeq(NEW_POKE_SYSCALL_ADDR + 0x10, 0x7cc428ae7cc329aeULL); // Original: 0xEBC2FE107C7F1B78ULL
+        pokeq(NEW_POKE_SYSCALL_ADDR + 0x10, 0x7cc428ae7cc329aeULL); // Original: 0xEBC225B87C7F1B78ULL
         pokeq(NEW_POKE_SYSCALL_ADDR + 0x18, 0x4bffffec4e800020ULL); // Original: 0x3860032DFBA100E8ULL
         usleep(5000);
     }
@@ -234,24 +239,23 @@ static inline void remove_lv2_memcpy()
     }
 }
 
-
 static u64 lv1poke(u64 addr, u64 value)
 {
     lv2syscall2(9, (u64) addr, (u64) value);
     return_to_user_prog(u64);
 }
 
-
 void load_payload_475(int mode)
 {
-/*
-//Remove Lv2 memory protection, NOT needed for REBUG 4.75 and HABIB 4.75
+
+//Remove Lv2 memory protection, NOT needed for REBUG 4.7x
         lv1poke(0x370F28 + 0, 0x0000000000000001ULL); // Original: 0x0000000000351FD8ULL
         lv1poke(0x370F28 + 8, 0xE0D251B556C59F05ULL); // Original: 0x3B5B965B020AE21AULL
         lv1poke(0x370F28 + 16, 0xC232FCAD552C80D7ULL); // Original: 0x7D6F60B118E2E81BULL
         lv1poke(0x370F28 + 24, 0x65140CD200000000ULL); // Original: 0x315D8B7700000000ULL
-*/
+
     install_lv2_memcpy();
+
     /* WARNING!! It supports only payload with a size multiple of 8 */
     lv2_memcpy(0x8000000000000000ULL + (u64) PAYLOAD_OFFSET,
                    (u64) payload_sky_475_bin,
@@ -261,19 +265,19 @@ void load_payload_475(int mode)
                       (u64) umount_475_bin,
                       umount_475_bin_size);
 
-    restore_syscall8[0]= SYSCALL_BASE + 64ULL; // (8*8)
+    restore_syscall8[0]= SYSCALL_BASE + (u64) (SYSCALL_SK1E * 8ULL); // (8*8)
     restore_syscall8[1]= peekq(restore_syscall8[0]);
 
     u64 id[2];
     // copy the id
     id[0]= 0x534B314500000000ULL | (u64) PAYLOAD_OFFSET;
-    id[1] = SYSCALL_BASE + 64ULL; // (8*8)
+    id[1] = SYSCALL_BASE + (u64) (SYSCALL_SK1E * 8ULL); // (8*8)
     lv2_memcpy(0x80000000000004f0ULL, (u64) &id[0], 16);
 
     u64 inst8 =  peekq(0x8000000000003000ULL);                     // get TOC
     lv2_memcpy(0x8000000000000000ULL + (u64) (PAYLOAD_OFFSET + 0x28), (u64) &inst8, 8);
     inst8 = 0x8000000000000000ULL + (u64) (PAYLOAD_OFFSET + 0x20); // syscall_8_desc - sys8
-    lv2_memcpy(SYSCALL_BASE + (u64) (8 * 8), (u64) &inst8, 8);
+    lv2_memcpy(SYSCALL_BASE + (u64) (SYSCALL_SK1E * 8ULL), (u64) &inst8, 8);
 
     usleep(1000);
 
@@ -282,24 +286,36 @@ void load_payload_475(int mode)
     pokeq(0x80000000007EF000ULL, 0ULL);// BD Emu mount
     pokeq(0x80000000007EF220ULL, 0ULL);
 
-    //patches by deank , backup protection removal needed since OFW 4.60+
-	pokeq(0x8000000000056230ULL, 0x386000012F830000ULL ); // ignore LIC.DAT check
-	pokeq(0x80000000002275F4ULL, 0x38600000F8690000ULL ); // fix 0x8001002B / 80010017 errors (2015-01-03)
+    //patches by deank for webMAN, I left them here just in case someone wants to play with, but basically the same thing with SYS36 patches below
+    /*
+			pokeq(0x800000000026714CULL, 0x4E80002038600000ULL ); // fix 8001003C error  Original: 0x4E8000208003026CULL
+			pokeq(0x8000000000267154ULL, 0x7C6307B44E800020ULL ); // fix 8001003C error  Original: 0x3D6000473D201B43ULL
+			pokeq(0x800000000005658CULL, 0x63FF003D60000000ULL ); // fix 8001003D error  Original: 0x63FF003D419EFFD4ULL
+			pokeq(0x8000000000056650ULL, 0x3FE080013BE00000ULL ); // fix 8001003E error  Original: 0x3FE0800163FF003EULL
+
+			pokeq(0x80000000000565FCULL, 0x419E00D860000000ULL ); // Original: 0x419E00D8419D00C0ULL
+			pokeq(0x8000000000056604ULL, 0x2F84000448000098ULL ); // Original: 0x2F840004409C0048ULL //PATCH_JUMP
+			pokeq(0x800000000005A6E0ULL, 0x2F83000060000000ULL ); // fix 80010009 error  Original: 0x2F830000419E00ACULL
+			pokeq(0x800000000005A6F4ULL, 0x2F83000060000000ULL ); // fix 80010009 error  Original: 0x2F830000419E00ACULL
+    */
+			pokeq(0x8000000000056230ULL, 0x386000012F830000ULL ); // ignore LIC.DAT check
+			pokeq(0x80000000002275F4ULL, 0x38600000F8690000ULL ); // fix 0x8001002B / 80010017 errors (2015-01-03)
+
+			//pokeq(0x8000000000055C5CULL, 0xF821FE917C0802A6ULL ); // just restore the original
+			//pokeq(0x8000000000058E1CULL, 0x419E0038E8610098ULL ); // just restore the original
 
     /* BASIC PATCHES SYS36 */
     // by 2 anonymous people
-    _poke32(0x56600, 0x60000000);             // 
-    PATCH_JUMP(0x56608, 0x566A0);             // 
+    _poke32(0x56600, 0x60000000);             //
+    PATCH_JUMP(0x56608, 0x566A0);             //
     _poke32(0x5A6E4,  0x60000000);            // fix 80010009 error
     _poke32(0x5A6F8,  0x60000000);            // fix 80010019 error
     _poke(  0x5658C,  0x63FF003D60000000); // fix 8001003D error  "ori     %r31, %r31, 0x3D\n nop\n" done
     _poke32(0x56654,  0x3BE00000);            // fix 8001003E error -- 3.55 ok in 0x055F64 "li      %r31, 0"  done
 
-    PATCH_JUMP(0x56658, 0x56564);          // Not present in rebug, anyway..
-
     //Fix 0x8001003C error (incorrect version in sys_load_param) - It is present in the new game updates **/
     _poke(0x267150, 0x386000007C6307B4); //
-    _poke32(0x267150 + 8, 0x4E800020);  //
+    _poke32(0x267150 + 0x10, 0x4E800020);  //
 
     /*
         -002c3cf0  f8 01 00 b0 7c 9c 23 78  7c 7d 1b 78 4b d8 aa 1d  |....|.#x|}.xK...|
@@ -307,7 +323,7 @@ void load_payload_475(int mode)
     */
 
     PATCH_JUMP(0x29765C, (PAYLOAD_OFFSET+0x30)); // patch openhook - done
-    //_poke32(0x297638, 0xF821FF61); // free openhook Rogero 4.30 (put "stdu    %sp, -0xA0(%sp)" instead   "b       sub_2E9F98")
+    //_poke32(0x2975C0, 0xF821FF61); // free openhook Rogero 4.30 (put "stdu    %sp, -0xA0(%sp)" instead   "b       sub_2E9F98")
 
 #ifdef CONFIG_USE_SYS8PERMH4
     PATCH_JUMP(PERMS_OFFSET, (PAYLOAD_OFFSET+0x18));
@@ -345,7 +361,7 @@ static int lv2_patch_storage_475(void)
     save_lv2_storage_patch= peekq(0x80000000002ECAB0ULL);
     pokeq32(0x80000000002ECAB0ULL, 0x40000000); //FIXED
 
-
+// LV1 Offsets
     regs_i.reg3 = 0x16fa60; regs_i.reg4 = 0x7f83e37860000000ULL;
     regs_i.reg11 = 0xB6;
     sys8_lv1_syscall(&regs_i, &regs_o); save_lv1_storage_patches[0]= regs_o.reg4;
@@ -382,6 +398,7 @@ static int lv2_unpatch_storage_475(void)
     // LV2 disable syscall storage
     pokeq(0x80000000002ECAB0ULL, save_lv2_storage_patch); //FIXED
 
+// LV1 Offsets
     regs_i.reg11 = 0xB7;
 
     regs_i.reg3 = 0x16fa60; regs_i.reg4 = save_lv1_storage_patches[0];

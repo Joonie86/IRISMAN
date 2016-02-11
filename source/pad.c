@@ -106,7 +106,7 @@ unsigned ps3pad_read()
 
             if(butt) pad_last_time = sec;
 
-            break;
+            if (paddata.len > 0) break;
         }
     }
 

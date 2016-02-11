@@ -32,6 +32,23 @@
 
 #define MAX_PATH        0x420
 
+#define ATA_HDD             0x101000000000007ULL
+#define BDVD_DRIVE          0x101000000000006ULL
+#define PATA0_HDD_DRIVE     0x101000000000008ULL
+#define PATA0_BDVD_DRIVE    BDVD_DRIVE
+#define PATA1_HDD_DRIVE     ATA_HDD
+#define PATA1_BDVD_DRIVE    0x101000000000009ULL
+#define BUILTIN_FLASH       0x100000000000001ULL
+#define MEMORY_STICK        0x103000000000010ULL
+#define SD_CARD             0x103000100000010ULL
+#define COMPACT_FLASH       0x103000200000010ULL
+
+#define USB_MASS_STORAGE_1(n)	(0x10300000000000AULL+n) /* For 0-5 */
+#define USB_MASS_STORAGE_2(n)	(0x10300000000001FULL+(n-6)) /* For 6-127 */
+
+#define HDD_PARTITION(n)		(ATA_HDD | ((uint64_t)n<<32))
+#define FLASH_PARTITION(n)	(BUILTIN_FLASH | ((uint64_t)n<<32))
+
 #define DEVICE_TYPE_PS3_DVD   0xFF70
 #define DEVICE_TYPE_PS3_BD    0xFF71
 #define DEVICE_TYPE_PS2_CD    0xFF60
@@ -43,7 +60,7 @@
 #define DEVICE_TYPE_BDMRE     0x43
 #define DEVICE_TYPE_DVD       0x10 /* DVD-ROM, DVD+-R, DVD+-RW etc, they are differenced by booktype field in some scsi command */
 #define DEVICE_TYPE_CD        0x08 /* CD-ROM, CD-DA, CD-R, CD-RW, etc, they are differenced somehow with scsi commands */
-
+#define DEVICE_TYPE_USB       0x00
 
 enum DiscType
 {
@@ -161,4 +178,12 @@ int cobra_unset_psp_umd(void);
 int cobra_read_config(CobraConfig *cfg);
 int cobra_write_config(CobraConfig *cfg);
 int cobra_get_ps2_emu_type(void);
+
+int sys_map_path(char *oldpath, char *newpath);
+
+int cobra_get_disc_type(unsigned int *real_disctype, unsigned int *effective_disctype, unsigned int *iso_disctype);
+int cobra_disc_auth(void);
+
+void reset_usb_ports(char *_path);
+int wm_cobra_map_game(char *path, char *title_id);
 #endif

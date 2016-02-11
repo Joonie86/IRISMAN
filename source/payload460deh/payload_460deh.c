@@ -61,6 +61,9 @@ extern u64 restore_syscall8[2];
 #define PATCH_JUMP(add_orig, add_dest) _poke32(add_orig, 0x48000000 | ((add_dest-add_orig) & 0x3fffffc))
 #define PATCH_CALL(add_orig, add_dest) _poke32(add_orig, 0x48000000 | ((add_dest-add_orig) & 0x3fffffc) | 1)
 
+bool file_exists( char* path );
+int is_cobra_based(void);
+
 static int lv2_unpatch_bdvdemu_460deh(void);
 static int lv2_patch_bdvdemu_460deh(uint32_t flags);
 static int lv2_patch_storage_460deh(void);
@@ -123,7 +126,7 @@ int is_payload_loaded_460deh(void)
     if((addr>>32) == 0x534B3145) { // new method to detect the payload
         addr&= 0xffffffff;
         if(addr) {
-            restore_syscall8[0]= SYSCALL_BASE + 64ULL; // (8*8)
+            restore_syscall8[0]= SYSCALL_BASE + (u64) (SYSCALL_SK1E * 8ULL); // (8*8)
             restore_syscall8[1]= peekq(restore_syscall8[0]);
             pokeq(restore_syscall8[0], 0x8000000000000000ULL + (u64) (addr + 0x20));
         }
@@ -131,7 +134,7 @@ int is_payload_loaded_460deh(void)
         return SKY10_PAYLOAD;
     }
 
-    addr = peekq((SYSCALL_BASE + 36 * 8));
+    addr = peekq((SYSCALL_BASE + SYSCALL_36 * 8));
     addr = peekq(addr);
     if(peekq(addr - 0x20) == 0x534B313000000000ULL) //SK10 HEADER
         return SKY10_PAYLOAD;
@@ -227,7 +230,7 @@ void load_payload_460deh(int mode)
         lv1poke(0x370F28 + 8 , 0xE0D251B556C59F05ULL); // Original: 0x3B5B965B020AE21AULL
         lv1poke(0x370F28 + 16, 0xC232FCAD552C80D7ULL); // Original: 0x7D6F60B118E2E81BULL
         lv1poke(0x370F28 + 24, 0x65140CD200000000ULL); // Original: 0x315D8B7700000000ULL
-*/    
+*/
     install_lv2_memcpy();
     /* WARNING!! It supports only payload with a size multiple of 8 */
     lv2_memcpy(0x8000000000000000ULL + (u64) PAYLOAD_OFFSET,
@@ -238,19 +241,19 @@ void load_payload_460deh(int mode)
                       (u64) umount_460deh_bin,
                       umount_460deh_bin_size);
 
-    restore_syscall8[0]= SYSCALL_BASE + 64ULL; // (8*8)
+    restore_syscall8[0]= SYSCALL_BASE + (u64) (SYSCALL_SK1E * 8ULL); // (8*8)
     restore_syscall8[1]= peekq(restore_syscall8[0]);
 
     u64 id[2];
     // copy the id
     id[0]= 0x534B314500000000ULL | (u64) PAYLOAD_OFFSET;
-    id[1] = SYSCALL_BASE + 64ULL; // (8*8)
+    id[1] = SYSCALL_BASE + (u64) (SYSCALL_SK1E * 8ULL); // (8*8)
     lv2_memcpy(0x80000000000004f0ULL, (u64) &id[0], 16);
 
     u64 inst8 =  peekq(0x8000000000003000ULL);                     // get TOC
     lv2_memcpy(0x8000000000000000ULL + (u64) (PAYLOAD_OFFSET + 0x28), (u64) &inst8, 8);
     inst8 = 0x8000000000000000ULL + (u64) (PAYLOAD_OFFSET + 0x20); // syscall_8_desc - sys8
-    lv2_memcpy(SYSCALL_BASE + (u64) (8 * 8), (u64) &inst8, 8);
+    lv2_memcpy(SYSCALL_BASE + (u64) (SYSCALL_SK1E * 8ULL), (u64) &inst8, 8);
 
     usleep(1000);
 
@@ -263,17 +266,17 @@ void load_payload_460deh(int mode)
 	pokeq(0x8000000000059FE4ULL, 0x386000012F830000ULL ); // ignore LIC.DAT check - 460 DEH ok!
 	pokeq(0x800000000023740CULL, 0x38600000F8690000ULL ); // fix 0x8001002B / 80010017 errors (2015-01-03)  - 460 DEH ok!
 
-	
+
     /* BASIC PATCHES SYS36 */
     // by 2 anonymous people
     _poke32(0x5A3B4, 0x60000000);          // Original: 0x419E00D8419D00C0ULL -> 0x419E00D860000000ULL
     PATCH_JUMP(0x5A3BC, 0x5A454);          // Original: 0x2F840004409C0048ULL -> 0x2F84000448000098ULL
-    _poke32(0x05E410, 0x60000000);         // fix 80010009 error
-    _poke32(0x05E424, 0x60000000);         // fix 80010019 error
-    _poke(  0x05A340, 0x63FF003D60000000); // fix 8001003D error  "ori     %r31, %r31, 0x3D\n nop\n" done
-    _poke32(0x05A408, 0x3BE00000);         // fix 8001003E error -- 4.60 DEH ok in 0x055F64 "ori    r31, r31, 0x3E # 0x8001003E"  done
+    _poke32(0x5E410, 0x60000000);         // fix 80010009 error
+    _poke32(0x5E424, 0x60000000);         // fix 80010019 error
+    _poke(  0x5A340, 0x63FF003D60000000); // fix 8001003D error  "ori     %r31, %r31, 0x3D\n nop\n" done
+    _poke32(0x5A408, 0x3BE00000);         // fix 8001003E error -- 4.60 DEH ok in 0x055F64 "ori    r31, r31, 0x3E # 0x8001003E"  done
 
-    //PATCH_JUMP(0x5A40C, 0x5A318);          // Not present in rebug, anyway..
+    PATCH_JUMP(0x5A40C, 0x5A318);          // Not present in rebug, anyway..
 
     _poke(0x2771BC, 0x386000007C6307B4); //fix 8001003C error
     _poke32(0x2771BC + 8, 0x4E800020);   //
@@ -284,7 +287,7 @@ void load_payload_460deh(int mode)
     */
 
     PATCH_JUMP(0x2D1488, (PAYLOAD_OFFSET+0x30)); // patch openhook - done
-    //_poke32(0x2D1464, 0xF821FF61); // free openhook Rogero 4.30 (put "stdu    %sp, -0xA0(%sp)" instead   "b       sub_2E9F98")
+    _poke32(0x2D1464, 0xF821FF61); // free openhook Rogero 4.30 (put "stdu    %sp, -0xA0(%sp)" instead   "b       sub_2E9F98")
 
 #ifdef CONFIG_USE_SYS8PERMH4
     PATCH_JUMP(PERMS_OFFSET, (PAYLOAD_OFFSET+0x18));
