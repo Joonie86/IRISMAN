@@ -289,8 +289,8 @@ void load_payload_480(int mode)
     _poke32(0x56650,  0x3BE00000);            // fix 8001003E error -- 3.55 ok in 0x055F64 "li      %r31, 0"  done
 
     //Fix 0x8001003C error (incorrect version in sys_load_param) - It is present in the new game updates **/
-    //_poke(0x267148, 0x386000007C6307B4); // DON'T USE THIS JUST YET
-    //_poke32(0x267148 + 0x10, 0x4E800020);  //
+    _poke(0x267148, 0x386000007C6307B4); // 
+    _poke32(0x267148 + 0x8, 0x4E800020);  // <- the same as the old style.
 
     /*
         -002c3cf0  f8 01 00 b0 7c 9c 23 78  7c 7d 1b 78 4b d8 aa 1d  |....|.#x|}.xK...|
