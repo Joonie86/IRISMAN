@@ -87,6 +87,7 @@ u32 snd_inited = 0;
 #include "payload475/payload_475.h"
 #include "payload475dex/payload_475dex.h"
 #include "payload478deh/payload_478deh.h"
+#include "payload480/payload_480.h"
 
 #include "spu_soundmodule.bin.h" // load SPU Module
 #include "spu_soundlib.h"
@@ -3757,6 +3758,14 @@ s32 main(s32 argc, const char* argv[])
         off_psid  = off_idps2 + 0x18ULL;
         payload_mode = is_payload_loaded_478deh();
     }
+    else if(is_firm_480())
+    {
+        firmware  = 0x480C;
+        off_idps  = 0x80000000003E2E30ULL;
+        off_idps2 = 0x8000000000474AF4ULL;
+        off_psid  = off_idps2 + 0x18ULL;
+        payload_mode = is_payload_loaded_480();
+    }
 
     if(is_cobra_based()) use_cobra = true;
 
@@ -4376,6 +4385,24 @@ s32 main(s32 argc, const char* argv[])
             {
                 case ZERO_PAYLOAD: //no payload installed
                     load_payload_478deh(payload_mode);
+                    __asm__("sync");
+                    sleep(1); /* maybe need it, maybe not */
+
+                    if(!use_cobra && install_mamba)
+                    {
+                        use_mamba = load_ps3_mamba_payload();
+                    }
+                    break;
+                case SKY10_PAYLOAD:
+                    break;
+            }
+            break;
+        case 0x480C:
+            set_bdvdemu_480(payload_mode);
+            switch(payload_mode)
+            {
+                case ZERO_PAYLOAD: //no payload installed
+                    load_payload_480(payload_mode);
                     __asm__("sync");
                     sleep(1); /* maybe need it, maybe not */
 

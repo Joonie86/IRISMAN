@@ -2,8 +2,8 @@ PPU_CC = ppu-gcc
 PPU_OBJCOPY = ppu-objcopy
 
 TARGET		:=	$(notdir $(CURDIR))
-PAYLOADS := 355 355dex 355deh 421 421dex 430 430dex 431 440 441 441dex 446 446dex 450 450dex 453 453dex 455 455dex 460 460dex 460deh 465 465dex 466 470 470dex 475 475dex 478deh
-SPECIALPAYLOADS:= psx_storage ps3_storage ps3_controlfan
+PAYLOADS := 355 355dex 355deh 421 421dex 430 430dex 431 440 441 441dex 446 446dex 450 450dex 453 453dex 455 455dex 460 460dex 460deh 465 465dex 466 470 470dex 475 475dex 475deh 480
+SPECIALPAYLOADS:= psx_storage ps3_storage ps3_controlfan payload_sm
 
 all: CFW341 $(SPECIALPAYLOADS) $(PAYLOADS)
 

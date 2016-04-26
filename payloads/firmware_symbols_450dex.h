@@ -7,7 +7,7 @@
 
 #define memory_patch_func           0x2B8210
 //#define pathdup_from_user           0x1b1dc4
-#define open_mapping_table_ext      0x7fff00                                                                                                                                           
+#define open_mapping_table_ext      0x7fff00
 
 /* Common Symbols PL3 */
 
@@ -18,5 +18,5 @@
 #define perm_var_offset             -0x7FF8
 
 #define BASE        0x3D90
-#define BASE2        (0x3D90+0x400)  // 0x4290  // pincha en -> 1B5070 (syscall 838)
+#define BASE2       (0x3D90+0x400)  // 0x4290  // pincha en -> 1B5070 (syscall 838)
 

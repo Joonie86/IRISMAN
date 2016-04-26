@@ -54,7 +54,7 @@ SOURCES		+=  source/payload446  source/payload446dex  source/payload450     sour
 SOURCES		+=  source/payload453  source/payload453dex  source/payload455     source/payload455dex
 SOURCES		+=  source/payload460  source/payload460dex  source/payload460deh
 SOURCES		+=  source/payload465  source/payload465dex
-SOURCES		+=  source/payload470  source/payload470dex  source/payload475     source/payload475dex     source/payload478deh
+SOURCES		+=  source/payload470  source/payload470dex  source/payload475     source/payload475dex     source/payload478deh  source/payload480  
 
 DATA		:=  datas
 SHADERS		:=  shaders
@@ -66,7 +66,7 @@ INCLUDES	+=  include/payload446  include/payload446dex  include/payload450     i
 INCLUDES	+=  include/payload453  include/payload453dex  include/payload455     include/payload455dex
 INCLUDES	+=  include/payload460  include/payload460dex  include/payload460deh
 INCLUDES	+=  include/payload465  include/payload465dex
-INCLUDES	+=  include/payload470  include/payload470dex  include/payload475     include/payload475dex     include/payload478deh
+INCLUDES	+=  include/payload470  include/payload470dex  include/payload475     include/payload475dex     include/payload478deh  include/payload480
 
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project

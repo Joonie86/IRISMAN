@@ -130,8 +130,12 @@
 #include "firmware_symbols_475dex.h"
 #endif
 
-#ifdef CFW_478deh
-#include "firmware_symbols_478deh.h"
+#ifdef CFW_475deh
+#include "firmware_symbols_475deh.h"
+#endif
+
+#ifdef CFW_480
+#include "firmware_symbols_480.h"
 #endif
 
 #define ABS(target) ((target) - (BASE2) - .)

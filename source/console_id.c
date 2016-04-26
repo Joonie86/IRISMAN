@@ -47,6 +47,7 @@
 #include "payload470/payload_470.h"
 #include "payload470dex/payload_470dex.h"
 #include "payload478deh/payload_478deh.h"
+#include "payload480/payload_480.h"
 
 #include "utils.h"
 #include "osk_input.h"
